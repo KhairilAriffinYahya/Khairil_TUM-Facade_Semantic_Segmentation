@@ -71,7 +71,7 @@ class TestCustomDataset():
 
     def __getitem__(self, index):
         point_set_ini = self.scene_points_list[index]
-        points = point_set_ini[:,:6]
+        points = point_set_ini[:,:3]
         labels = self.semantic_labels_list[index]
         coord_min, coord_max = np.amin(points, axis=0)[:3], np.amax(points, axis=0)[:3]
         grid_x = int(np.ceil(float(coord_max[0] - coord_min[0] - self.block_size) / self.stride) + 1)
@@ -130,7 +130,7 @@ def parse_args():
     parser.add_argument('--exp_dir', type=str, default=None, help='Log path [default: None]')
     parser.add_argument('--visual', action='store_true', default=False, help='visualize result [default: False]')
     parser.add_argument('--test_area', type=str, default='DEBY_LOD2_4959323.las', help='area for testing, option: 1-6 [default: 5]')
-    parser.add_argument('--num_votes', type=int, default=3, help='aggregate segmentation scores with voting [default: 5]')
+    parser.add_argument('--num_votes', type=int, default=5, help='aggregate segmentation scores with voting [default: 5]')
     parser.add_argument('--model', type=str, help='model name [default: pointnet_sem_seg]')
     parser.add_argument('--output_model', type=str, default='/best_model.pth', help='model output name')
     return parser.parse_args()

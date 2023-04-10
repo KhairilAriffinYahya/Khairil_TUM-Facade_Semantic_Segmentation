@@ -42,7 +42,7 @@ def read_las_file_with_labels(file_path):
     return coords, labels
 
 class CustomDataset(Dataset):
-    def __init__(self, las_file_list='trainval_fullarea', num_classes=17, num_point=4096, block_size=1.0, sample_rate=1.0, transform=None, indices=None):
+    def __init__(self, las_file_list, num_classes=18, num_point=4096, block_size=1.0, sample_rate=1.0, transform=None, indices=None):
         super().__init__()
         self.num_point = num_point
         self.block_size = block_size
@@ -89,7 +89,6 @@ class CustomDataset(Dataset):
             # Calculate labelweights for the selected subset
             labelweights = np.zeros(adjustedclass)
             print("len = %f" % len(self.room_idxs))
-            ic = 0
             for room_idx in self.room_idxs:
                 labels = self.room_labels[room_idx]
                 tmp, _ = np.histogram(labels, range(range_class))
@@ -252,10 +251,8 @@ def main(args):
     train_indices, test_indices = random_split(range(len(lidar_dataset)), [train_size, test_size])
 
     print("start loading training data ...")
-    #TRAIN_DATASET = CustomDataset(las_file_list, num_classes=NUM_CLASSES, num_point=NUM_POINT, transform=None, indices=None)
     TRAIN_DATASET = CustomDataset(las_file_list, num_classes=NUM_CLASSES, num_point=NUM_POINT, transform=None, indices=train_indices)
     print("start loading test data ...")
-    #TEST_DATASET = CustomDataset(test_file, num_classes=NUM_CLASSES, num_point=NUM_POINT, transform=None, indices=None)
     TEST_DATASET = CustomDataset(las_file_list, num_classes=NUM_CLASSES, num_point=NUM_POINT, transform=None, indices=test_indices)
 
     trainDataLoader = DataLoader(TRAIN_DATASET, batch_size=BATCH_SIZE, shuffle=True, num_workers=10,
@@ -270,7 +267,6 @@ def main(args):
     log_string("The number of test data is: %d" % len(TEST_DATASET))
 
     print("Length of the dataset:", len(TRAIN_DATASET))
-    #print("las_file_list:", TRAIN_DATASET.las_file_list)
     print("Length of the trainDataLoader:", len(trainDataLoader))
 
     '''MODEL LOADING'''
