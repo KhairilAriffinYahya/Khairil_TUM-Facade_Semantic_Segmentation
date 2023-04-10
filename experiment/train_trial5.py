@@ -16,6 +16,8 @@ import glob
 from collections import Counter
 from torch.utils.data import Dataset, DataLoader, random_split
 import matplotlib.pyplot as plt
+import time
+
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT_DIR = BASE_DIR
@@ -479,9 +481,12 @@ def main(args):
 
 if __name__ == '__main__':
     args = parse_args()
+    start = time.time()
     accuracyChart = main(args)
 
+    end = time.time()
     max_value = max(accuracyChart)
     max_index = accuracyChart.index(max_value)
 
     print(max_index)
+    print(end-start)
