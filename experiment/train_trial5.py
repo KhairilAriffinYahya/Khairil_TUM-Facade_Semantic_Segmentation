@@ -485,4 +485,10 @@ if __name__ == '__main__':
     max_index = accuracyChart.index(max_value)
 
     print(max_index)
-    print(end-start)
+    timetaken = end-start
+    sec = timetaken%60
+    t1 = timetaken/60
+    min = t1%60
+    hour = t1/60
+
+    print("Time taken = %i:%i:%i" %hour %min %sec)
