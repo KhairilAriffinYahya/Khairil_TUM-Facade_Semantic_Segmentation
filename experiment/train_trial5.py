@@ -491,4 +491,4 @@ if __name__ == '__main__':
     mint = t1%60
     hour = t1/60
 
-    ("Time taken = %i:%i:%i" % (hour, mint, sec))
+    print("Time taken = %i:%i:%i" % (hour, mint, sec))
