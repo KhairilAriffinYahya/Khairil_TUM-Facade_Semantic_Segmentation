@@ -258,7 +258,7 @@ def main(args):
                 total_correct_class[l] += total_correct_class_tmp[l]
                 total_iou_deno_class[l] += total_iou_deno_class_tmp[l]
 
-            iou_map = np.array(total_correct_class_tmp) / (np.array(total_iou_deno_class_tmp, dtype=np.float) + 1e-6)
+            iou_map = np.array(total_correct_class_tmp) / (np.array(total_iou_deno_class_tmp, dtype=float) + 1e-6)
             print(iou_map)
             arr = np.array(total_seen_class_tmp)
             tmp_iou = np.mean(iou_map[arr != 0])
