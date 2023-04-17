@@ -90,7 +90,8 @@ class CustomDataset(Dataset):
             print("len = %f" % len(self.room_idxs))
             for room_idx in self.room_idxs:
                 labels = self.room_labels[room_idx]
-                labelweights += np.bincount(labels, minlength=range_class)
+                tmp, _ = np.histogram(labels, range(range_class))
+                labelweights += tmp
 
         print("total points,	1 wall,	2 window,	3 door,	4 balcony,	5 molding,	6 deco,	7 column,	8 arch,	9 drainpipe,	10 stairs,	11 ground surface,	12 terrain,	13 roof,	14 blinds,	15 outer ceiling surface,	16 interior,	17 other ")
         print(labelweights)
