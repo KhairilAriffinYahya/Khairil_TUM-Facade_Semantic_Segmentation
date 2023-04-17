@@ -88,9 +88,9 @@ class CustomDataset(Dataset):
             # Calculate labelweights for the selected subset
             labelweights = np.zeros(adjustedclass)
             print("len = %f" % len(self.room_idxs))
-            labels = self.room_labels[self.room_idxs]
-            for label in labels:
-                labelweights += np.bincount(label, minlength=range_class)
+            for room_idx in self.room_idxs:
+                labels = self.room_labels[room_idx]
+                labelweights += np.bincount(labels, minlength=range_class)
 
         print("total points,	1 wall,	2 window,	3 door,	4 balcony,	5 molding,	6 deco,	7 column,	8 arch,	9 drainpipe,	10 stairs,	11 ground surface,	12 terrain,	13 roof,	14 blinds,	15 outer ceiling surface,	16 interior,	17 other ")
         print(labelweights)
