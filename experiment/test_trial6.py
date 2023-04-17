@@ -21,7 +21,6 @@ sys.path.append(os.path.join(ROOT_DIR, 'models'))
 classes = ["total", "wall", "window",  "door",  "balcony","molding", "deco", "column", "arch","drainpipe","stairs",  "ground surface",
   "terrain",  "roof",  "blinds", "outer ceiling surface", "interior", "other"]
 class2label = {cls: i for i, cls in enumerate(classes)}
-root = args.rootdir
 NUM_CLASSES = 18
 seg_classes = class2label
 seg_label_to_cat = {}
@@ -152,6 +151,8 @@ def main(args):
         logger.info(str)
         print(str)
 
+    root = args.rootdir
+    
     '''HYPER PARAMETER'''
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
     if args.exp_dir is None:
