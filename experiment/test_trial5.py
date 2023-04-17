@@ -271,12 +271,13 @@ def main(args):
                     pl_save.write(str(int(i)) + '\n')
                 pl_save.close()
 
-            for i in range(whole_scene_label.shape[0]):
-                if args.visual:
+            if args.visual:
+                for i in range(whole_scene_label.shape[0]):
                     fout.write('v %f %f %f\n' % (
                         whole_scene_data[i, 0], whole_scene_data[i, 1], whole_scene_data[i, 2]))
                     fout_gt.write('v %f %f %f\n' % (
                         whole_scene_data[i, 0], whole_scene_data[i, 1], whole_scene_data[i, 2]))
+
             if args.visual:
                 fout.close()
                 fout_gt.close()
