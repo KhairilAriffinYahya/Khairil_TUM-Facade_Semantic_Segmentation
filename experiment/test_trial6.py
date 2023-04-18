@@ -287,9 +287,18 @@ def main(args):
         IoU = np.array(total_correct_class) / (np.array(total_iou_deno_class, dtype=np.float) + 1e-6)
         iou_per_class_str = '------- IoU --------\n'
         for l in range(NUM_CLASSES):
+            tmp = float(total_iou_deno_class[l])
+
+            if tmp == 0:
+                tmp = 0
+            else:
+                tmp = total_correct_class[l] / float(total_iou_deno_class[l])
+
+
             iou_per_class_str += 'class %s, IoU: %.3f \n' % (
-                seg_label_to_cat[l] + ' ' * (14 - len(seg_label_to_cat[l])),
-                total_correct_class[l] / float(total_iou_deno_class[l]))
+                seg_label_to_cat[l] + ' ' * (14 - len(seg_label_to_cat[l])),tmp )
+
+
         log_string(iou_per_class_str)
         log_string('eval point avg class IoU: %f' % np.mean(IoU))
         log_string('eval whole scene point avg class acc: %f' % (
