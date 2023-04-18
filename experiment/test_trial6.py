@@ -32,7 +32,7 @@ print(seg_label_to_cat)
 
 class TestCustomDataset():
     # prepare to give prediction on each points
-    def __init__(self, las_file_list='trainval_fullarea', num_classes=17, block_points=4096, stride=0.5, block_size=1.0, padding=0.001):
+    def __init__(self, root, las_file_list='trainval_fullarea', num_classes=17, block_points=4096, stride=0.5, block_size=1.0, padding=0.001):
         self.block_points = block_points
         self.block_size = block_size
         self.padding = padding
@@ -47,8 +47,8 @@ class TestCustomDataset():
         self.semantic_labels_list = []
         self.room_coord_min, self.room_coord_max = [], []
 
-        for file in self.file_list:
-            file_path = os.path.join(root, file)
+        for files in self.file_list:
+            file_path = os.path.join(root, files)
             in_file = laspy.read(file_path)
             points = np.vstack((in_file.x, in_file.y, in_file.z)).T
             labels = np.array(in_file.classification, dtype=np.int32)
@@ -182,7 +182,7 @@ def main(args):
 
     test_file = glob.glob(root + args.test_area )
 
-    TEST_DATASET_WHOLE_SCENE = TestCustomDataset(test_file, num_classes=NUM_CLASSES, block_points=NUM_POINT)
+    TEST_DATASET_WHOLE_SCENE = TestCustomDataset(root, test_file, num_classes=NUM_CLASSES, block_points=NUM_POINT)
     log_string("The number of test data is: %d" % len(TEST_DATASET_WHOLE_SCENE))
 
     '''MODEL LOADING'''
