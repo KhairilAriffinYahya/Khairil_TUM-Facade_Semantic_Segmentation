@@ -35,7 +35,7 @@ classes = ["wall", "window",  "door",  "molding", "other", "terrain", "column", 
 # 6: column
 # 7: arch
 class2label = {cls: i for i, cls in enumerate(classes)}
-NUM_CLASSES = 18
+NUM_CLASSES = 8
 seg_classes = class2label
 seg_label_to_cat = {}
 train_ratio = 0.7

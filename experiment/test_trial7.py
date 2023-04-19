@@ -22,7 +22,7 @@ classes = ["wall", "window",  "door",  "molding", "other", "terrain", "column", 
 #classes = ["total", "wall", "window",  "door",  "balcony","molding", "deco", "column", "arch","drainpipe","stairs",  "ground surface",
 # "terrain",  "roof",  "blinds", "outer ceiling surface", "interior", "other"]
 class2label = {cls: i for i, cls in enumerate(classes)}
-NUM_CLASSES = 18
+NUM_CLASSES = 8
 seg_classes = class2label
 seg_label_to_cat = {}
 for i, cat in enumerate(seg_classes.keys()):
@@ -48,11 +48,24 @@ class TestCustomDataset():
         self.semantic_labels_list = []
         self.room_coord_min, self.room_coord_max = [], []
 
+        new_class_mapping = {1: 0, 2: 1, 3:2, 6: 3, 13: 4, 11: 5, 7: 6, 8: 7}
+
         for files in self.file_list:
             file_path = os.path.join(root, files)
             in_file = laspy.read(file_path)
             points = np.vstack((in_file.x, in_file.y, in_file.z)).T
             labels = np.array(in_file.classification, dtype=np.int32)
+
+            # Merge labels as per instructions
+            labels[(labels == 5) | (labels == 6)] = 6  # Merge molding and decoration
+            labels[(labels == 1) |(labels == 9) | (labels == 15) | (labels == 10)] = 1  # Merge wall, drainpipe, outer ceiling surface, and stairs
+            labels[(labels == 12) | (labels == 11)] = 11  # Merge terrain and ground surface
+            labels[(labels == 13) | (labels == 16) | (labels == 17)] = 13  # Merge interior, roof, and other
+            labels[labels == 14] = 2  # Add blinds to window
+
+            # Map merged labels to new labels (0 to 7)
+            labels = np.vectorize(new_class_mapping.get)(labels)
+
             data = np.hstack((points, labels.reshape((-1, 1))))
             self.scene_points_list.append(data[:, :3])
             self.semantic_labels_list.append(data[:, 3])
