@@ -18,10 +18,10 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT_DIR = BASE_DIR
 sys.path.append(os.path.join(ROOT_DIR, 'models'))
 
-classes = ["total", "wall", "window",  "door",  "balcony","molding", "deco", "column", "arch","drainpipe","stairs",  "ground surface",
-  "terrain",  "roof",  "blinds", "outer ceiling surface", "interior", "other"]
+classes = ["wall", "window",  "door",  "molding", "other", "terrain", "column", "arch"]
+#classes = ["total", "wall", "window",  "door",  "balcony","molding", "deco", "column", "arch","drainpipe","stairs",  "ground surface",
+# "terrain",  "roof",  "blinds", "outer ceiling surface", "interior", "other"]
 class2label = {cls: i for i, cls in enumerate(classes)}
-root = 'data/tum/tum-facade/training/selected/'
 NUM_CLASSES = 18
 seg_classes = class2label
 seg_label_to_cat = {}
@@ -33,23 +33,23 @@ print(seg_label_to_cat)
 
 class TestCustomDataset():
     # prepare to give prediction on each points
-    def __init__(self, las_file_list='trainval_fullarea', num_classes=17, block_points=4096, stride=0.5, block_size=1.0, padding=0.001):
+    def __init__(self, root, las_file_list='trainval_fullarea', num_classes=8, block_points=4096, stride=0.5, block_size=1.0, padding=0.001):
         self.block_points = block_points
         self.block_size = block_size
         self.padding = padding
         self.file_list = las_file_list
         self.stride = stride
         self.scene_points_num = []
-        
+
         adjustedclass = num_classes
         range_class = adjustedclass+1
 
         self.scene_points_list = []
         self.semantic_labels_list = []
         self.room_coord_min, self.room_coord_max = [], []
-        
-        for file in self.file_list:
-            file_path = os.path.join(root, file)
+
+        for files in self.file_list:
+            file_path = os.path.join(root, files)
             in_file = laspy.read(file_path)
             points = np.vstack((in_file.x, in_file.y, in_file.z)).T
             labels = np.array(in_file.classification, dtype=np.int32)
@@ -71,23 +71,22 @@ class TestCustomDataset():
 
     def __getitem__(self, index):
         point_set_ini = self.scene_points_list[index]
-        points = point_set_ini[:,:6]
+        points = point_set_ini[:,:3]
         labels = self.semantic_labels_list[index]
         coord_min, coord_max = np.amin(points, axis=0)[:3], np.amax(points, axis=0)[:3]
         grid_x = int(np.ceil(float(coord_max[0] - coord_min[0] - self.block_size) / self.stride) + 1)
         grid_y = int(np.ceil(float(coord_max[1] - coord_min[1] - self.block_size) / self.stride) + 1)
         data_room, label_room, sample_weight, index_room = np.array([]), np.array([]), np.array([]),  np.array([])
-        for index_y in range(0, grid_y):
-            for index_x in range(0, grid_x):
+        for index_y in range(grid_y):
+            for index_x in range(grid_x):
                 s_x = coord_min[0] + index_x * self.stride
                 e_x = min(s_x + self.block_size, coord_max[0])
                 s_x = e_x - self.block_size
                 s_y = coord_min[1] + index_y * self.stride
                 e_y = min(s_y + self.block_size, coord_max[1])
                 s_y = e_y - self.block_size
-                point_idxs = np.where(
-                    (points[:, 0] >= s_x - self.padding) & (points[:, 0] <= e_x + self.padding) & (points[:, 1] >= s_y - self.padding) & (
-                                points[:, 1] <= e_y + self.padding))[0]
+                point_idxs = np.where((points[:, 0] >= s_x - self.padding) & (points[:, 0] <= e_x + self.padding) &
+                                      (points[:, 1] >= s_y - self.padding) & (points[:, 1] <= e_y + self.padding))[0]
                 if point_idxs.size == 0:
                     continue
                 num_batch = int(np.ceil(point_idxs.size / self.block_points))
@@ -103,7 +102,6 @@ class TestCustomDataset():
                 normlized_xyz[:, 2] = data_batch[:, 2] / coord_max[2]
                 data_batch[:, 0] = data_batch[:, 0] - (s_x + self.block_size / 2.0)
                 data_batch[:, 1] = data_batch[:, 1] - (s_y + self.block_size / 2.0)
-                data_batch[:, 3:6] /= 255.0
                 data_batch = np.concatenate((data_batch, normlized_xyz), axis=1)
                 label_batch = labels[point_idxs].astype(int)
                 batch_weight = self.labelweights[label_batch]
@@ -132,8 +130,10 @@ def parse_args():
     parser.add_argument('--exp_dir', type=str, default=None, help='Log path [default: None]')
     parser.add_argument('--visual', action='store_true', default=False, help='visualize result [default: False]')
     parser.add_argument('--test_area', type=str, default='DEBY_LOD2_4959323.las', help='area for testing, option: 1-6 [default: 5]')
-    parser.add_argument('--num_votes', type=int, default=3, help='aggregate segmentation scores with voting [default: 5]')
+    parser.add_argument('--num_votes', type=int, default=5, help='aggregate segmentation scores with voting [default: 5]')
     parser.add_argument('--model', type=str, help='model name [default: pointnet_sem_seg]')
+    parser.add_argument('--output_model', type=str, default='/best_model.pth', help='model output name')
+    parser.add_argument('--rootdir', type=str, default='/content/drive/MyDrive/ data/tum/tum-facade/training/selected/', help='directory to data')
     return parser.parse_args()
 
 
@@ -152,6 +152,8 @@ def main(args):
         logger.info(str)
         print(str)
 
+    root = args.rootdir
+    
     '''HYPER PARAMETER'''
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
     if args.exp_dir is None:
@@ -181,19 +183,20 @@ def main(args):
 
     test_file = glob.glob(root + args.test_area )
 
-    TEST_DATASET_WHOLE_SCENE = TestCustomDataset(test_file, num_classes=NUM_CLASSES, block_points=NUM_POINT)
+    TEST_DATASET_WHOLE_SCENE = TestCustomDataset(root, test_file, num_classes=NUM_CLASSES, block_points=NUM_POINT)
     log_string("The number of test data is: %d" % len(TEST_DATASET_WHOLE_SCENE))
 
     '''MODEL LOADING'''
-    tmp_model_name = args.model
-    if tmp_model_name == None:
-        model_name = os.listdir(experiment_dir + '/logs')[0].split('.')[0]
+    model_name = args.output_model
+    tmp_model = args.model
+    if tmp_model == None:
+        model_dir = os.listdir(experiment_dir + '/logs')[0].split('.')[0]
     else:
-        model_name = tmp_model_name
-    print(model_name)
-    MODEL = importlib.import_module(model_name)
+        model_dir = tmp_model
+    print(model_dir)
+    MODEL = importlib.import_module(model_dir)
     classifier = MODEL.get_model(NUM_CLASSES).cuda()
-    checkpoint = torch.load(str(experiment_dir) + '/checkpoints/best_model.pth')
+    checkpoint = torch.load(str(experiment_dir) + '/checkpoints'+model_name)
     classifier.load_state_dict(checkpoint['model_state_dict'])
     classifier = classifier.eval()
 
@@ -216,7 +219,6 @@ def main(args):
             if args.visual:
                 fout = open(os.path.join(visual_dir, scene_id[batch_idx] + '_pred.obj'), 'w')
                 fout_gt = open(os.path.join(visual_dir, scene_id[batch_idx] + '_gt.obj'), 'w')
-            #whole_scene_data = TEST_DATASET_WHOLE_SCENE.scene_points_list[batch_idx][:, :3]
             whole_scene_data = TEST_DATASET_WHOLE_SCENE.scene_points_list[batch_idx]
             whole_scene_label = TEST_DATASET_WHOLE_SCENE.semantic_labels_list[batch_idx]
             vote_label_pool = np.zeros((whole_scene_label.shape[0], NUM_CLASSES))
@@ -238,10 +240,6 @@ def main(args):
                     batch_label[0:real_batch_size, ...] = scene_label[start_idx:end_idx, ...]
                     batch_point_index[0:real_batch_size, ...] = scene_point_index[start_idx:end_idx, ...]
                     batch_smpw[0:real_batch_size, ...] = scene_smpw[start_idx:end_idx, ...]
-                    #batch_data[:, :, 3:6] /= 1.0
-
-                    #batch_data[:, :, :3] /= 1.0  # Remove the color-related scaling
-
 
                     torch_data = torch.Tensor(batch_data)
                     torch_data = torch_data.float().cuda()
@@ -263,7 +261,7 @@ def main(args):
                 total_correct_class[l] += total_correct_class_tmp[l]
                 total_iou_deno_class[l] += total_iou_deno_class_tmp[l]
 
-            iou_map = np.array(total_correct_class_tmp) / (np.array(total_iou_deno_class_tmp, dtype=np.float) + 1e-6)
+            iou_map = np.array(total_correct_class_tmp) / (np.array(total_iou_deno_class_tmp, dtype=float) + 1e-6)
             print(iou_map)
             arr = np.array(total_seen_class_tmp)
             tmp_iou = np.mean(iou_map[arr != 0])
@@ -276,12 +274,13 @@ def main(args):
                     pl_save.write(str(int(i)) + '\n')
                 pl_save.close()
 
-            for i in range(whole_scene_label.shape[0]):
-                if args.visual:
+            if args.visual:
+                for i in range(whole_scene_label.shape[0]):
                     fout.write('v %f %f %f\n' % (
                         whole_scene_data[i, 0], whole_scene_data[i, 1], whole_scene_data[i, 2]))
                     fout_gt.write('v %f %f %f\n' % (
                         whole_scene_data[i, 0], whole_scene_data[i, 1], whole_scene_data[i, 2]))
+
             if args.visual:
                 fout.close()
                 fout_gt.close()
@@ -289,9 +288,18 @@ def main(args):
         IoU = np.array(total_correct_class) / (np.array(total_iou_deno_class, dtype=np.float) + 1e-6)
         iou_per_class_str = '------- IoU --------\n'
         for l in range(NUM_CLASSES):
+            tmp = float(total_iou_deno_class[l])
+
+            if tmp == 0:
+                tmp = 0
+            else:
+                tmp = total_correct_class[l] / float(total_iou_deno_class[l])
+
+
             iou_per_class_str += 'class %s, IoU: %.3f \n' % (
-                seg_label_to_cat[l] + ' ' * (14 - len(seg_label_to_cat[l])),
-                total_correct_class[l] / float(total_iou_deno_class[l]))
+                seg_label_to_cat[l] + ' ' * (14 - len(seg_label_to_cat[l])),tmp )
+
+
         log_string(iou_per_class_str)
         log_string('eval point avg class IoU: %f' % np.mean(IoU))
         log_string('eval whole scene point avg class acc: %f' % (

@@ -16,18 +16,29 @@ import glob
 from collections import Counter
 from torch.utils.data import Dataset, DataLoader, random_split
 import matplotlib.pyplot as plt
+import time
+
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT_DIR = BASE_DIR
 sys.path.append(os.path.join(ROOT_DIR, 'models'))
 
-classes = ["total", "wall", "window",  "door",  "balcony","molding", "deco", "column", "arch","drainpipe","stairs",  "ground surface",
-  "terrain",  "roof",  "blinds", "outer ceiling surface", "interior", "other"]
+classes = ["wall", "window",  "door",  "molding", "other", "terrain", "column", "arch"]
+#classes = ["total", "wall", "window",  "door",  "balcony","molding", "deco", "column", "arch","drainpipe","stairs",  "ground surface",
+# "terrain",  "roof",  "blinds", "outer ceiling surface", "interior", "other"]
+# 0: wall
+# 1: window
+# 2: door
+# 3: molding
+# 4: other
+# 5: terrain
+# 6: column
+# 7: arch
 class2label = {cls: i for i, cls in enumerate(classes)}
-root = 'data/tum/tum-facade/training/selected/'
 NUM_CLASSES = 18
 seg_classes = class2label
 seg_label_to_cat = {}
+train_ratio = 0.7
 
 for i, cat in enumerate(seg_classes.keys()):
     seg_label_to_cat[i] = cat
@@ -39,7 +50,7 @@ def read_las_file_with_labels(file_path):
     return coords, labels
 
 class CustomDataset(Dataset):
-    def __init__(self, las_file_list='trainval_fullarea', num_classes=17, num_point=4096, block_size=1.0, sample_rate=1.0, transform=None, indices=None):
+    def __init__(self, las_file_list, num_classes=8, num_point=4096, block_size=1.0, sample_rate=1.0, transform=None, indices=None):
         super().__init__()
         self.num_point = num_point
         self.block_size = block_size
@@ -56,12 +67,25 @@ class CustomDataset(Dataset):
         num_point_all = []
         labelweights = np.zeros(adjustedclass)
 
+        new_class_mapping = {1: 0, 2: 1, 3:2, 6: 3, 13: 4, 11: 5, 7: 6, 8: 7}
+
         for room_path in rooms:
             # Read LAS file
             print("Reading = " + room_path)
             las_data = laspy.read(room_path)
             coords = np.vstack((las_data.x, las_data.y, las_data.z)).transpose()
             labels = np.array(las_data.classification, dtype=np.uint8)
+
+            # Merge labels as per instructions
+            labels[(labels == 5) | (labels == 6)] = 6  # Merge molding and decoration
+            labels[(labels == 1) |(labels == 9) | (labels == 15) | (labels == 10)] = 1  # Merge wall, drainpipe, outer ceiling surface, and stairs
+            labels[(labels == 12) | (labels == 11)] = 11  # Merge terrain and ground surface
+            labels[(labels == 13) | (labels == 16) | (labels == 17)] = 13  # Merge interior, roof, and other
+            labels[labels == 14] = 2  # Add blinds to window
+
+            # Map merged labels to new labels (0 to 7)
+            labels = np.vectorize(new_class_mapping.get)(labels)
+
             room_data = np.concatenate((coords, labels[:, np.newaxis]), axis=1)  # xyzl, N*4
             points, labels = room_data[:, 0:3], room_data[:, 3]  # xyz, N*3; l, N
             tmp, _ = np.histogram(labels, range(range_class))
@@ -86,7 +110,6 @@ class CustomDataset(Dataset):
             # Calculate labelweights for the selected subset
             labelweights = np.zeros(adjustedclass)
             print("len = %f" % len(self.room_idxs))
-            ic = 0
             for room_idx in self.room_idxs:
                 labels = self.room_labels[room_idx]
                 tmp, _ = np.histogram(labels, range(range_class))
@@ -132,7 +155,6 @@ class CustomDataset(Dataset):
         current_labels = labels[selected_point_idxs]
         if self.transform is not None:
             current_points, current_labels = self.transform(current_points, current_labels)
-        #print("Data shape:", points.shape)
 
         return current_points, current_labels
 
@@ -162,6 +184,8 @@ def parse_args():
     parser.add_argument('--step_size', type=int, default=10, help='Decay step for lr decay [default: every 10 epochs]')
     parser.add_argument('--lr_decay', type=float, default=0.7, help='Decay rate for lr decay [default: 0.7]')
     parser.add_argument('--test_area', type=str, default='DEBY_LOD2_4959323.las', help='Which area to use for test, option: 1-6 [default: 5]')
+    parser.add_argument('--output_model', type=str, default='/best_model.pth', help='model output name')
+    parser.add_argument('--rootdir', type=str, default='/content/drive/MyDrive/ data/tum/tum-facade/training/selected/', help='directory to data')
 
     return parser.parse_args()
 
@@ -198,6 +222,7 @@ def main(args):
         logger.info(str)
         print(str)
 
+    root = args.rootdir
     '''HYPER PARAMETER'''
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
 
@@ -238,12 +263,10 @@ def main(args):
 
     las_file_list = [file for file in glob.glob(root + '/*.las') if not file.endswith(args.test_area )]
 
-    #test_file = glob.glob(root + args.test_area )
 
     lidar_dataset = CustomDataset(las_file_list, num_classes=NUM_CLASSES, num_point=NUM_POINT, transform=None)
     print("Dataset taken")
     # Split the dataset into training and evaluation sets
-    train_ratio = 0.7
     train_size = int(train_ratio * len(lidar_dataset))
     test_size = len(lidar_dataset) - train_size
 
@@ -251,10 +274,8 @@ def main(args):
     train_indices, test_indices = random_split(range(len(lidar_dataset)), [train_size, test_size])
 
     print("start loading training data ...")
-    #TRAIN_DATASET = CustomDataset(las_file_list, num_classes=NUM_CLASSES, num_point=NUM_POINT, transform=None, indices=None)
     TRAIN_DATASET = CustomDataset(las_file_list, num_classes=NUM_CLASSES, num_point=NUM_POINT, transform=None, indices=train_indices)
     print("start loading test data ...")
-    #TEST_DATASET = CustomDataset(test_file, num_classes=NUM_CLASSES, num_point=NUM_POINT, transform=None, indices=None)
     TEST_DATASET = CustomDataset(las_file_list, num_classes=NUM_CLASSES, num_point=NUM_POINT, transform=None, indices=test_indices)
 
     trainDataLoader = DataLoader(TRAIN_DATASET, batch_size=BATCH_SIZE, shuffle=True, num_workers=10,
@@ -269,7 +290,6 @@ def main(args):
     log_string("The number of test data is: %d" % len(TEST_DATASET))
 
     print("Length of the dataset:", len(TRAIN_DATASET))
-    #print("las_file_list:", TRAIN_DATASET.las_file_list)
     print("Length of the trainDataLoader:", len(trainDataLoader))
 
     '''MODEL LOADING'''
@@ -290,8 +310,11 @@ def main(args):
             torch.nn.init.xavier_normal_(m.weight.data)
             torch.nn.init.constant_(m.bias.data, 0.0)
 
+    model_name = args.output_model
+
+
     try:
-        checkpoint = torch.load(str(experiment_dir) + '/checkpoints/best_model.pth')
+        checkpoint = torch.load(str(experiment_dir) + '/checkpoints'+model_name)
         start_epoch = checkpoint['epoch']
         classifier.load_state_dict(checkpoint['model_state_dict'])
         log_string('Use pretrain model')
@@ -457,7 +480,7 @@ def main(args):
             if mIoU >= best_iou:
                 best_iou = mIoU
                 logger.info('Save model...')
-                savepath = str(checkpoints_dir) + '/best_model.pth'
+                savepath = str(checkpoints_dir) + model_name
                 log_string('Saving at %s' % savepath)
                 state = {
                     'epoch': epoch,
@@ -477,14 +500,18 @@ def main(args):
 
 if __name__ == '__main__':
     args = parse_args()
+    start = time.time()
     accuracyChart = main(args)
 
-    plt.plot(accuracyChart)
-    #plt.xlabel('Index')
-    #plt.ylabel('Accuracy')
-    #plt.show()
-
+    end = time.time()
     max_value = max(accuracyChart)
     max_index = accuracyChart.index(max_value)
 
     print(max_index)
+    timetaken = end-start
+    sec = timetaken%60
+    t1 = timetaken/60
+    mint = t1%60
+    hour = t1/60
+
+    print("Time taken = %i:%i:%i" % (hour, mint, sec))
