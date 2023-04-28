@@ -222,8 +222,6 @@ def main(args):
         logger.info(str)
         print(str)
 
-    starttime=time.time()
-
     root = args.rootdir
     '''HYPER PARAMETER'''
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
@@ -348,8 +346,8 @@ def main(args):
     global_epoch = 0
     best_iou = 0
 
-    end = time.time()
-    timetaken = end-start
+    midpt = time.time()
+    timetaken = midpt-start
     sec = timetaken%60
     t1 = timetaken/60
     mint = t1%60
