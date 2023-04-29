@@ -17,6 +17,7 @@ from collections import Counter
 from torch.utils.data import Dataset, DataLoader, random_split
 import matplotlib.pyplot as plt
 import time
+import pickle
 
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -139,6 +140,29 @@ class CustomDataset(Dataset):
     def __len__(self):
         return len(self.room_idxs)
 
+    def save_data(self, file_path):
+        data = {
+            'room_points': self.room_points,
+            'room_labels': self.room_labels,
+            'room_coord_min': self.room_coord_min,
+            'room_coord_max': self.room_coord_max,
+            'room_idxs': self.room_idxs,
+            'labelweights': self.labelweights,
+        }
+
+        with open(file_path, 'wb') as f:
+            pickle.dump(data, f)
+
+    def load_data(self, file_path):
+        with open(file_path, 'rb') as f:
+            data = pickle.load(f)
+
+        self.room_points = data['room_points']
+        self.room_labels = data['room_labels']
+        self.room_coord_min = data['room_coord_min']
+        self.room_coord_max = data['room_coord_max']
+        self.room_idxs = data['room_idxs']
+        self.labelweights = data['labelweights']
 
 
 def inplace_relu(m):
