@@ -200,8 +200,6 @@ def main(args):
         logger.info(str)
         print(str)
 
-    starttime
-
     root = args.rootdir
     '''HYPER PARAMETER'''
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
