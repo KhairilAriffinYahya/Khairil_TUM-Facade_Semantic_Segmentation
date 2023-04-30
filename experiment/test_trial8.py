@@ -1,7 +1,3 @@
-"""
-Author: Benny
-Date: Nov 2019
-"""
 import argparse
 import os
 import torch
@@ -13,16 +9,26 @@ from tqdm import tqdm
 import laspy
 import glob
 import numpy as np
+import time
+import pickle
+import open3d as o3d
+import h5py
+from localfunctions import timePrint, CurrentTime, add_vote
+import pytz
 
+'''Adjust permanent/file/static variables here'''
+
+timezone = pytz.timezone('Asia/Singapore')
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-ROOT_DIR = BASE_DIR
-sys.path.append(os.path.join(ROOT_DIR, 'models'))
-
+# 0: wall, # 1: window, # 2: door, # 3: molding, # 4: other, # 5: terrain, # 6: column, # 7: arch
 classes = ["wall", "window",  "door",  "molding", "other", "terrain", "column", "arch"]
-#classes = ["total", "wall", "window",  "door",  "balcony","molding", "deco", "column", "arch","drainpipe","stairs",  "ground surface",
-# "terrain",  "roof",  "blinds", "outer ceiling surface", "interior", "other"]
-class2label = {cls: i for i, cls in enumerate(classes)}
 NUM_CLASSES = 8
+train_ratio = 0.7
+
+''''''
+
+sys.path.append(os.path.join(BASE_DIR, 'models'))
+class2label = {cls: i for i, cls in enumerate(classes)}
 seg_classes = class2label
 seg_label_to_cat = {}
 for i, cat in enumerate(seg_classes.keys()):
@@ -30,24 +36,43 @@ for i, cat in enumerate(seg_classes.keys()):
 
 print(seg_label_to_cat)
 
+def parse_args():
+    '''PARAMETERS'''
+    parser = argparse.ArgumentParser('Model')
+    parser.add_argument('--batch_size', type=int, default=32, help='batch size in testing [default: 32]')
+    parser.add_argument('--gpu', type=str, default='0', help='specify gpu device')
+    parser.add_argument('--num_point', type=int, default=4096, help='point number [default: 4096]')
+    parser.add_argument('--log_dir', type=str, required=True, help='experiment root')
+    parser.add_argument('--exp_dir', type=str, default=None, help='Log path [default: None]')
+    parser.add_argument('--visual', action='store_true', default=False, help='visualize result [default: False]')
+    parser.add_argument('--test_area', type=str, default='DEBY_LOD2_4959323.las', help='area for testing, option: 1-6 [default: 5]')
+    parser.add_argument('--num_votes', type=int, default=5, help='aggregate segmentation scores with voting [default: 5]')
+    parser.add_argument('--model', type=str, help='model name [default: pointnet_sem_seg]')
+    parser.add_argument('--output_model', type=str, default='/best_model.pth', help='model output name')
+    parser.add_argument('--rootdir', type=str, default='/content/drive/MyDrive/ data/tum/tum-facade/training/selected/', help='directory to data')
+    return parser.parse_args()
 
 class TestCustomDataset():
     # prepare to give prediction on each points
-    def __init__(self, root, las_file_list='trainval_fullarea', num_classes=8, block_points=4096, stride=0.5, block_size=1.0, padding=0.001):
+    def __init__(self, root, las_file_list=None, num_classes=8, block_points=4096, stride=0.5, block_size=1.0, padding=0.001):
         self.block_points = block_points
         self.block_size = block_size
         self.padding = padding
         self.file_list = las_file_list
         self.stride = stride
+        self.num_classes = num_classes
+
         self.scene_points_num = []
-
-        adjustedclass = num_classes
-        range_class = adjustedclass+1
-
         self.scene_points_list = []
         self.semantic_labels_list = []
         self.room_coord_min, self.room_coord_max = [], []
+        self.labelweights = np.zeros((num_classes,))
 
+        if las_file_list is None:
+            return
+
+        adjustedclass = num_classes
+        range_class = adjustedclass+1
         new_class_mapping = {1: 0, 2: 1, 3:2, 6: 3, 13: 4, 11: 5, 7: 6, 8: 7}
 
         for files in self.file_list:
@@ -132,41 +157,104 @@ class TestCustomDataset():
     def __len__(self):
         return len(self.scene_points_list)
 
+    def calculate_labelweights(self):
+        print("Calculate Weights")
+        num_classes = len(self.labelweights)
+        labelweights = np.zeros(num_classes)
+        tmp_scene_points_num = []
+        for seg in self.semantic_labels_list:
+            tmp, _ = np.histogram(seg, range(num_classes + 1))
+            tmp_scene_points_num.append(seg.shape[0])
+            labelweights += tmp
 
-def parse_args():
-    '''PARAMETERS'''
-    parser = argparse.ArgumentParser('Model')
-    parser.add_argument('--batch_size', type=int, default=32, help='batch size in testing [default: 32]')
-    parser.add_argument('--gpu', type=str, default='0', help='specify gpu device')
-    parser.add_argument('--num_point', type=int, default=4096, help='point number [default: 4096]')
-    parser.add_argument('--log_dir', type=str, required=True, help='experiment root')
-    parser.add_argument('--exp_dir', type=str, default=None, help='Log path [default: None]')
-    parser.add_argument('--visual', action='store_true', default=False, help='visualize result [default: False]')
-    parser.add_argument('--test_area', type=str, default='DEBY_LOD2_4959323.las', help='area for testing, option: 1-6 [default: 5]')
-    parser.add_argument('--num_votes', type=int, default=5, help='aggregate segmentation scores with voting [default: 5]')
-    parser.add_argument('--model', type=str, help='model name [default: pointnet_sem_seg]')
-    parser.add_argument('--output_model', type=str, default='/best_model.pth', help='model output name')
-    parser.add_argument('--rootdir', type=str, default='/content/drive/MyDrive/ data/tum/tum-facade/training/selected/', help='directory to data')
-    return parser.parse_args()
+        print(labelweights)
+        labelweights = labelweights.astype(np.float32)
+        labelweights = labelweights / np.sum(labelweights)  # normalize weights to 1
+        labelweights = np.power(np.amax(labelweights) / labelweights, 1 / 3.0)  # balance weights
+        self.scene_points_num = tmp_scene_points_num
+
+        print(labelweights)
 
 
-def add_vote(vote_label_pool, point_idx, pred_label, weight):
-    B = pred_label.shape[0]
-    N = pred_label.shape[1]
-    for b in range(B):
-        for n in range(N):
-            if weight[b, n] != 0 and not np.isinf(weight[b, n]):
-                vote_label_pool[int(point_idx[b, n]), int(pred_label[b, n])] += 1
-    return vote_label_pool
+        return labelweights
 
+    def copy(self, new_indices):
+        new_dataset = TestCustomDataset()
+        new_dataset.block_points = self.block_points
+        new_dataset.block_size = self.block_size
+        new_dataset.padding = self.padding
+        new_dataset.file_list = self.file_list
+        new_dataset.stride = self.stride
+        new_dataset.num_classes = self.num_classes
+        new_dataset.scene_points_num = [self.scene_points_num[i] for i in new_indices]
+        new_dataset.scene_points_list = [self.scene_points_list[i] for i in new_indices]
+        new_dataset.semantic_labels_list = [self.semantic_labels_list[i] for i in new_indices]
+        new_dataset.room_coord_min = [self.room_coord_min[i] for i in new_indices]
+        new_dataset.room_coord_max = [self.room_coord_max[i] for i in new_indices]
+
+        # Calculate labelweights for new points
+        num_classes = len(self.labelweights)
+        labelweights = np.zeros(num_classes)
+        tmp_scene_points_num = []
+        for seg in new_dataset.semantic_labels_list:
+            tmp, _ = np.histogram(seg, range(num_classes + 1))
+            tmp_scene_points_num.append(seg.shape[0])
+            labelweights += tmp
+        labelweights = labelweights.astype(np.float32)
+        labelweights = labelweights / np.sum(labelweights)
+        new_dataset.labelweights = np.power(np.amax(labelweights) / labelweights, 1 / 3.0)
+        new_dataset.scene_points_num = tmp_scene_points_num
+
+        return new_dataset
+
+
+
+    def index_update(self, newIndices):
+        tmp_scene_points_num = []
+        tmp_scene_points_list = []
+        tmp_semantic_labels_list = []
+        tmp_room_coord_min, tmp_room_coord_max = [], []
+        tmp_labelweights = np.zeros((self.num_classes,))
+
+        self.scene_points_list = [self.scene_points_list[i] for i in newIndices]
+        self.semantic_labels_list = [self.semantic_labels_list[i] for i in newIndices]
+        self.room_coord_min = [self.room_coord_min[i] for i in newIndices]
+        self.room_coord_max = [self.room_coord_max[i] for i in newIndices]
+
+        # Recompute labelweights
+        num_classes = len(self.labelweights)
+        labelweights = np.zeros(num_classes)
+        for seg in self.semantic_labels_list:
+            tmp, _ = np.histogram(seg, range(num_classes + 1))
+            tmp_scene_points_num.append(seg.shape[0])
+            labelweights += tmp
+        labelweights = labelweights.astype(np.float32)
+        labelweights = labelweights / np.sum(labelweights)
+        self.labelweights = np.power(np.amax(labelweights) / labelweights, 1 / 3.0)
+        self.scene_points_num = tmp_scene_points_num
+
+    def save_data(self, file_path):
+        with open(file_path, 'wb') as f:
+            pickle.dump(self, f)
+
+    @staticmethod
+    def load_data(file_path):
+        with open(file_path, 'rb') as f:
+            dataset = pickle.load(f)
+        return dataset
 
 def main(args):
     def log_string(str):
         logger.info(str)
         print(str)
 
+    '''Initialize'''
     root = args.rootdir
-    
+    BATCH_SIZE = args.batch_size
+    NUM_POINT = args.num_point
+    test_file = glob.glob(root + args.test_area )
+
+
     '''HYPER PARAMETER'''
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
     if args.exp_dir is None:
@@ -191,11 +279,7 @@ def main(args):
     log_string('PARAMETER ...')
     log_string(args)
 
-    BATCH_SIZE = args.batch_size
-    NUM_POINT = args.num_point
-
-    test_file = glob.glob(root + args.test_area )
-
+    '''Dataset'''
     TEST_DATASET_WHOLE_SCENE = TestCustomDataset(root, test_file, num_classes=NUM_CLASSES, block_points=NUM_POINT)
     log_string("The number of test data is: %d" % len(TEST_DATASET_WHOLE_SCENE))
 
@@ -213,6 +297,7 @@ def main(args):
     classifier.load_state_dict(checkpoint['model_state_dict'])
     classifier = classifier.eval()
 
+    '''Testing'''
     with torch.no_grad():
         scene_id = TEST_DATASET_WHOLE_SCENE.file_list
         scene_id = [x[:-4] for x in scene_id]
@@ -263,6 +348,8 @@ def main(args):
                     vote_label_pool = add_vote(vote_label_pool, batch_point_index[0:real_batch_size, ...],
                                                batch_pred_label[0:real_batch_size, ...],
                                                batch_smpw[0:real_batch_size, ...])
+
+            CurrentTime(timezone)
 
             pred_label = np.argmax(vote_label_pool, 1)
 

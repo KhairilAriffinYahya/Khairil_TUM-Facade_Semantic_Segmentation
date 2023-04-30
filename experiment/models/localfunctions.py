@@ -20,7 +20,29 @@ import time
 import pickle
 import open3d as o3d
 import h5py
+from datetime import datetime
+import pytz
 
+
+
+def timePrint(start):
+    currTime = time.time()
+    timetaken = currTime-start
+    sec = timetaken%60
+    t1 = timetaken/60
+    mint = t1%60
+    hour = t1/60
+
+    print("Time taken = %i:%i:%i" % (hour, mint, sec))
+
+def CurrentTime(timezone):
+    now = datetime.now(timezone)
+    current_time = now.strftime("%H:%M:%S")
+    print("Current Time =", current_time)
+
+
+
+'''Training'''
 def read_las_file_with_labels(file_path):
     las_data = laspy.read(file_path)
     coords = np.vstack((las_data.x, las_data.y, las_data.z)).transpose()
@@ -56,35 +78,6 @@ def compute_class_weights(las_dataset):
     weight_list = [class_weights[label] for label in sorted(class_weights.keys())]
 
     return np.array(weight_list, dtype=np.float32)
-
-
-def timePrint(start):
-    currTime = time.time()
-    timetaken = currTime-start
-    sec = timetaken%60
-    t1 = timetaken/60
-    mint = t1%60
-    hour = t1/60
-
-    print("Time taken = %i:%i:%i" % (hour, mint, sec))
-
-def calculate_labelweights(dataset, num_classes):
-    print("Calculate Weights")
-    labelweights = np.zeros(num_classes)
-    for labels in dataset.room_labels:
-        tmp, _ = np.histogram(labels, range(num_classes + 1))
-        labelweights += tmp
-
-    print("wall", "window", "door", "molding", "other", "terrain", "column", "arch")
-    print(labelweights)
-    labelweights = labelweights.astype(np.float32)
-    labelweights = labelweights / np.sum(labelweights) #normalize weights to 1
-    labelweights = np.power(np.amax(labelweights) / labelweights, 1 / 3.0) #balance weights
-
-    print(labelweights)
-
-    return labelweights
-
 
 # Training
 def modelTraining(start_epoch, epoch, learning_rate, lr_decay, step_size, BATCH_SIZE, NUM_POINT, NUM_CLASSES,
@@ -252,3 +245,15 @@ def modelTraining(start_epoch, epoch, learning_rate, lr_decay, step_size, BATCH_
         global_epoch += 1
 
         return accuracyChart
+
+
+
+'''Testing'''
+def add_vote(vote_label_pool, point_idx, pred_label, weight):
+    B = pred_label.shape[0]
+    N = pred_label.shape[1]
+    for b in range(B):
+        for n in range(N):
+            if weight[b, n] != 0 and not np.isinf(weight[b, n]):
+                vote_label_pool[int(point_idx[b, n]), int(pred_label[b, n])] += 1
+    return vote_label_pool

@@ -20,10 +20,12 @@ import time
 import pickle
 import open3d as o3d
 import h5py
-import localfunctions
+from localfunctions import timePrint, CurrentTime, inplace_relu, modelTraining
+import pytz
 
 '''Adjust permanent/file/static variables here'''
 
+timezone = pytz.timezone('Asia/Singapore')
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 # 0: wall, # 1: window, # 2: door, # 3: molding, # 4: other, # 5: terrain, # 6: column, # 7: arch
 classes = ["wall", "window",  "door",  "molding", "other", "terrain", "column", "arch"]
@@ -38,6 +40,8 @@ seg_classes = class2label
 seg_label_to_cat = {}
 for i, cat in enumerate(seg_classes.keys()):
     seg_label_to_cat[i] = cat
+
+print(seg_label_to_cat)
 
 def parse_args():
     parser = argparse.ArgumentParser('Model')
@@ -60,12 +64,13 @@ def parse_args():
     return parser.parse_args()
 
 
-class CustomDataset(Dataset):
+class TrainCustomDataset(Dataset):
     def __init__(self, las_file_list=None, num_classes=8, num_point=4096, block_size=1.0, sample_rate=1.0, transform=None, indices=None):
         super().__init__()
         self.num_point = num_point
         self.block_size = block_size
         self.transform = transform
+        self.num_classes = num_classes
         self.room_points, self.room_labels = [], []
         self.room_coord_min, self.room_coord_max = [], []
         self.room_idxs = np.array([])
@@ -178,6 +183,22 @@ class CustomDataset(Dataset):
     def __len__(self):
         return len(self.room_idxs)
 
+    def calculate_labelweights(self):
+        print("Calculate Weights")
+        labelweights = np.zeros(self.num_classes)
+        for labels in self.room_labels:
+            tmp, _ = np.histogram(labels, range(self.num_classes + 1))
+            labelweights += tmp
+
+        print(labelweights)
+        labelweights = labelweights.astype(np.float32)
+        labelweights = labelweights / np.sum(labelweights)  # normalize weights to 1
+        labelweights = np.power(np.amax(labelweights) / labelweights, 1 / 3.0)  # balance weights
+
+        print(labelweights)
+
+        return labelweights
+
     def copy(self, indices=None):
         copied_dataset = CustomDataset()
         copied_dataset.num_point = self.num_point
@@ -198,7 +219,6 @@ class CustomDataset(Dataset):
             copied_dataset.room_idxs = self.room_idxs.copy()
 
         return copied_dataset
-
 
     def index_update(self, newIndices):
         new_room_points = []
@@ -282,7 +302,7 @@ def main(args):
     log_string(args)
 
     '''Load Dataset'''
-    lidar_dataset = CustomDataset(las_file_list, num_classes=NUM_CLASSES, num_point=NUM_POINT, transform=None)
+    lidar_dataset = TrainCustomDataset(las_file_list, num_classes=NUM_CLASSES, num_point=NUM_POINT, transform=None)
     print("Dataset taken")
 
     # Split the dataset into training and evaluation sets
@@ -291,16 +311,18 @@ def main(args):
     train_indices, test_indices = random_split(range(len(lidar_dataset)), [train_size, test_size])
 
     print("start loading training data ...")
-    #TRAIN_DATASET = CustomDataset(las_file_list, num_classes=NUM_CLASSES, num_point=NUM_POINT, transform=None, indices=train_indices)
+    #TRAIN_DATASET = TrainCustomDataset(las_file_list, num_classes=NUM_CLASSES, num_point=NUM_POINT, transform=None, indices=train_indices)
     TRAIN_DATASET = lidar_dataset.copy(indices=train_indices)
 
     timePrint(start)
+    CurrentTime(timezone)
 
     print("start loading test data ...")
-    #TEST_DATASET = CustomDataset(las_file_list, num_classes=NUM_CLASSES, num_point=NUM_POINT, transform=None, indices=test_indices)
+    #TEST_DATASET = TrainCustomDataset(las_file_list, num_classes=NUM_CLASSES, num_point=NUM_POINT, transform=None, indices=test_indices)
     TEST_DATASET = lidar_dataset.copy(indices=test_indices)
 
     timePrint(start)
+    CurrentTime(timezone)
 
     trainDataLoader = DataLoader(TRAIN_DATASET, batch_size=BATCH_SIZE, shuffle=True, num_workers=10,
                                                   pin_memory=True, drop_last=True,
@@ -308,8 +330,9 @@ def main(args):
     testDataLoader = DataLoader(TEST_DATASET, batch_size=BATCH_SIZE, shuffle=False, num_workers=10,
                                                  pin_memory=True, drop_last=True)
 
-    train_labelweights = calculate_labelweights(TRAIN_DATASET, NUM_CLASSES)
+    train_labelweights = TRAIN_DATASET.calculate_labelweights()
 
+    print("wall", "window", "door", "molding", "other", "terrain", "column", "arch")
     train_weights = torch.Tensor(train_labelweights).cuda()
 
     log_string("The number of training data is: %d" % len(TRAIN_DATASET))
@@ -365,6 +388,7 @@ def main(args):
 
     print("Data Preparation Complete")
     timePrint(start)
+    CurrentTime(timezone)
 
     accuracyChart = modelTraining(start_epoch, args.epoch, args.learning_rate, args.lr_decay, args.step_size, BATCH_SIZE,
                                   NUM_POINT, NUM_CLASSES,trainDataLoader, testDataLoader, classifier, optimizer, criterion,
@@ -386,3 +410,4 @@ if __name__ == '__main__':
     print(max_index)
     print("Training Complete")
     timePrint(start)
+    CurrentTime(timezone)
