@@ -80,7 +80,7 @@ def compute_class_weights(las_dataset):
     return np.array(weight_list, dtype=np.float32)
 
 # Training
-def modelTraining(start_epoch, endepoch, learning_rate, lr_decay, step_size, BATCH_SIZE, NUM_POINT, NUM_CLASSES,
+def modelTraining(start_epoch, endepoch, alearning_rate, alr_decay, astep_size, BATCH_SIZE, NUM_POINT, NUM_CLASSES,
                   trainDataLoader, testDataLoader, classifier, optimizer, criterion, train_weights, checkpoints_dir,
                   model_name, seg_label_to_cat, logger):
 
@@ -92,7 +92,7 @@ def modelTraining(start_epoch, endepoch, learning_rate, lr_decay, step_size, BAT
     LEARNING_RATE_CLIP = 1e-5
     MOMENTUM_ORIGINAL = 0.1
     MOMENTUM_DECCAY = 0.5
-    MOMENTUM_DECCAY_STEP = step_size
+    MOMENTUM_DECCAY_STEP = astep_size
     accuracyChart = []
 
     global_epoch = 0
@@ -106,7 +106,7 @@ def modelTraining(start_epoch, endepoch, learning_rate, lr_decay, step_size, BAT
     for epoch in range(start_epoch, endepoch):
         '''Train on chopped scenes'''
         log_string('**** Epoch %d (%d/%s) ****' % (global_epoch + 1, epoch + 1, endepoch))
-        lr = max(learning_rate * (lr_decay ** (epoch // step_size)), LEARNING_RATE_CLIP)
+        lr = max(alearning_rate * (alr_decay ** (epoch // astep_size)), LEARNING_RATE_CLIP)
         log_string('Learning rate:%f' % lr)
         for param_group in optimizer.param_groups:
             param_group['lr'] = lr
@@ -245,7 +245,7 @@ def modelTraining(start_epoch, endepoch, learning_rate, lr_decay, step_size, BAT
             log_string('Best mIoU: %f' % best_iou)
         global_epoch += 1
 
-        return accuracyChart
+    return accuracyChart
 
 
 
