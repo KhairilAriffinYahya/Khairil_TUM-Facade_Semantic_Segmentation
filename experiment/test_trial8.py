@@ -13,7 +13,7 @@ import time
 import pickle
 import open3d as o3d
 import h5py
-from localfunctions import timePrint, CurrentTime, add_vote
+from models.localfunctions import timePrint, CurrentTime, add_vote
 import pytz
 
 '''Adjust permanent/file/static variables here'''
@@ -107,6 +107,10 @@ class TestCustomDataset():
         labelweights = labelweights / np.sum(labelweights)
         self.labelweights = np.power(np.amax(labelweights) / labelweights, 1 / 3.0)
 
+        print("Scene points number length = %" %len(self.scene_points_num))
+        print("Total number of points = %" %len(self.scene_points_list))
+
+
     def __getitem__(self, index):
         point_set_ini = self.scene_points_list[index]
         points = point_set_ini[:,:3]
@@ -186,14 +190,15 @@ class TestCustomDataset():
         new_dataset.file_list = self.file_list
         new_dataset.stride = self.stride
         new_dataset.num_classes = self.num_classes
-        new_dataset.scene_points_num = [self.scene_points_num[i] for i in new_indices]
+        new_dataset.room_coord_min = self.room_coord_min
+        new_dataset.room_coord_max = self.room_coord_max
+
         new_dataset.scene_points_list = [self.scene_points_list[i] for i in new_indices]
         new_dataset.semantic_labels_list = [self.semantic_labels_list[i] for i in new_indices]
-        new_dataset.room_coord_min = [self.room_coord_min[i] for i in new_indices]
-        new_dataset.room_coord_max = [self.room_coord_max[i] for i in new_indices]
 
         # Calculate labelweights for new points
         num_classes = len(self.labelweights)
+        assert num_classes == new_dataset.num_classes
         labelweights = np.zeros(num_classes)
         tmp_scene_points_num = []
         for seg in new_dataset.semantic_labels_list:
@@ -209,22 +214,20 @@ class TestCustomDataset():
 
 
 
-    def index_update(self, newIndices):
+    def index_update(self, new_indices):
         tmp_scene_points_num = []
-        tmp_scene_points_list = []
-        tmp_semantic_labels_list = []
-        tmp_room_coord_min, tmp_room_coord_max = [], []
         tmp_labelweights = np.zeros((self.num_classes,))
+        tmp_scene_points_list = [self.scene_points_list[i] for i in new_indices]
+        tmp_semantic_labels_list = [self.semantic_labels_list[i] for i in new_indices]
 
-        self.scene_points_list = [self.scene_points_list[i] for i in newIndices]
-        self.semantic_labels_list = [self.semantic_labels_list[i] for i in newIndices]
-        self.room_coord_min = [self.room_coord_min[i] for i in newIndices]
-        self.room_coord_max = [self.room_coord_max[i] for i in newIndices]
+        self.scene_points_list = tmp_scene_points_list
+        self.semantic_labels_list = tmp_semantic_labels_list
 
         # Recompute labelweights
         num_classes = len(self.labelweights)
+        assert num_classes == self.num_classes
         labelweights = np.zeros(num_classes)
-        for seg in self.semantic_labels_list:
+        for seg in tmp_semantic_labels_list:
             tmp, _ = np.histogram(seg, range(num_classes + 1))
             tmp_scene_points_num.append(seg.shape[0])
             labelweights += tmp

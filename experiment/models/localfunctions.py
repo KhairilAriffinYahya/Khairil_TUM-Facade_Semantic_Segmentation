@@ -80,7 +80,7 @@ def compute_class_weights(las_dataset):
     return np.array(weight_list, dtype=np.float32)
 
 # Training
-def modelTraining(start_epoch, epoch, learning_rate, lr_decay, step_size, BATCH_SIZE, NUM_POINT, NUM_CLASSES,
+def modelTraining(start_epoch, endepoch, learning_rate, lr_decay, step_size, BATCH_SIZE, NUM_POINT, NUM_CLASSES,
                   trainDataLoader, testDataLoader, classifier, optimizer, criterion, train_weights, checkpoints_dir,
                   model_name, seg_label_to_cat, logger):
 
@@ -102,9 +102,10 @@ def modelTraining(start_epoch, epoch, learning_rate, lr_decay, step_size, BATCH_
         if isinstance(m, torch.nn.BatchNorm2d) or isinstance(m, torch.nn.BatchNorm1d):
             m.momentum = momentum
 
-    for epoch in range(start_epoch, epoch):
+
+    for epoch in range(start_epoch, endepoch):
         '''Train on chopped scenes'''
-        log_string('**** Epoch %d (%d/%s) ****' % (global_epoch + 1, epoch + 1, epoch))
+        log_string('**** Epoch %d (%d/%s) ****' % (global_epoch + 1, epoch + 1, endepoch))
         lr = max(learning_rate * (lr_decay ** (epoch // step_size)), LEARNING_RATE_CLIP)
         log_string('Learning rate:%f' % lr)
         for param_group in optimizer.param_groups:

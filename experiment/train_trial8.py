@@ -20,7 +20,7 @@ import time
 import pickle
 import open3d as o3d
 import h5py
-from localfunctions import timePrint, CurrentTime, inplace_relu, modelTraining
+from models.localfunctions import timePrint, CurrentTime, inplace_relu, modelTraining
 import pytz
 
 '''Adjust permanent/file/static variables here'''
@@ -200,45 +200,31 @@ class TrainCustomDataset(Dataset):
         return labelweights
 
     def copy(self, indices=None):
-        copied_dataset = CustomDataset()
+        copied_dataset = TrainCustomDataset()
         copied_dataset.num_point = self.num_point
         copied_dataset.block_size = self.block_size
         copied_dataset.transform = self.transform
+        copied_dataset.room_points = self.room_points.copy()
+        copied_dataset.room_labels = self.room_labels.copy()
+        copied_dataset.room_coord_min = self.room_coord_min.copy()
+        copied_dataset.room_coord_max = self.room_coord_max.copy()
 
         if indices is not None:
-            copied_dataset.room_points = [self.room_points[i] for i in indices]
-            copied_dataset.room_labels = [self.room_labels[i] for i in indices]
-            copied_dataset.room_coord_min = [self.room_coord_min[i] for i in indices]
-            copied_dataset.room_coord_max = [self.room_coord_max[i] for i in indices]
             copied_dataset.room_idxs = self.room_idxs[indices]
         else:
-            copied_dataset.room_points = self.room_points.copy()
-            copied_dataset.room_labels = self.room_labels.copy()
-            copied_dataset.room_coord_min = self.room_coord_min.copy()
-            copied_dataset.room_coord_max = self.room_coord_max.copy()
             copied_dataset.room_idxs = self.room_idxs.copy()
 
+        print("Totally {} samples in dataset.".format(len(copied_dataset.room_idxs)))
         return copied_dataset
 
     def index_update(self, newIndices):
-        new_room_points = []
-        new_room_labels = []
-        new_room_coord_min = []
-        new_room_coord_max = []
         new_room_idxs = []
 
         for idx in newIndices:
-            new_room_points.append(self.room_points[idx])
-            new_room_labels.append(self.room_labels[idx])
-            new_room_coord_min.append(self.room_coord_min[idx])
             new_room_coord_max.append(self.room_coord_max[idx])
             num_points = len(self.room_points[idx])
             new_room_idxs.extend([len(new_room_points) - 1] * num_points)
 
-        self.room_points = new_room_points
-        self.room_labels = new_room_labels
-        self.room_coord_min = new_room_coord_min
-        self.room_coord_max = new_room_coord_max
         self.room_idxs = new_room_idxs
 
     def save_data(self, file_path):
