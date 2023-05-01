@@ -1,7 +1,3 @@
-"""
-Author: Benny
-Date: Nov 2019
-"""
 import argparse
 import os
 import torch
@@ -13,16 +9,29 @@ from tqdm import tqdm
 import laspy
 import glob
 import numpy as np
+import open3d as o3d
+import pickle
+import h5py
+from models.localfunctions import timePrint, CurrentTime
+import pytz
+from geofunction import PCA, collFeatures, downsamplingPCD, createPCD
+import matplotlib.pyplot as plt
 
+'''Adjust permanent/file/static variables here'''
+
+timezone = pytz.timezone('Asia/Singapore')
+print("Check current time")
+CurrentTime(timezone)
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-ROOT_DIR = BASE_DIR
-sys.path.append(os.path.join(ROOT_DIR, 'models'))
-
+# 0: wall, # 1: window, # 2: door, # 3: molding, # 4: other, # 5: terrain, # 6: column, # 7: arch
 classes = ["wall", "window",  "door",  "molding", "other", "terrain", "column", "arch"]
-#classes = ["total", "wall", "window",  "door",  "balcony","molding", "deco", "column", "arch","drainpipe","stairs",  "ground surface",
-# "terrain",  "roof",  "blinds", "outer ceiling surface", "interior", "other"]
-class2label = {cls: i for i, cls in enumerate(classes)}
 NUM_CLASSES = 8
+train_ratio = 0.7
+
+''''''
+
+sys.path.append(os.path.join(BASE_DIR, 'models'))
+class2label = {cls: i for i, cls in enumerate(classes)}
 seg_classes = class2label
 seg_label_to_cat = {}
 for i, cat in enumerate(seg_classes.keys()):
@@ -58,98 +67,6 @@ def add_vote(vote_label_pool, point_idx, pred_label, weight):
             if weight[b, n] != 0 and not np.isinf(weight[b, n]):
                 vote_label_pool[int(point_idx[b, n]), int(pred_label[b, n])] += 1
     return vote_label_pool
-
-
-def PCA(data, correlation=False, sort=True):
-    average_data = np.mean(data, axis=0)  # 求 NX3 向量的均值
-    decentration_matrix = data - average_data  # 去中心化
-    H = np.dot(decentration_matrix.T, decentration_matrix)  # 求解协方差矩阵 H
-    eigenvectors, eigenvalues, eigenvectors_T = np.linalg.svd(H)  # SVD求解特征值、特征向量
-    # 屏蔽结束
-
-    if sort:
-        sort = eigenvalues.argsort()[::-1]  # 降序排列
-        eigenvalues = eigenvalues[sort]  # 索引
-        eigenvectors = eigenvectors[:, sort]
-
-    return eigenvalues, eigenvectors
-
-
-def collFeatures(pcd, length, size=0.8):
-    pcd_tree = o3d.geometry.KDTreeFlann(pcd)  # set a kd tree for tha point cloud, make searching faster
-    normals = []
-    llambda = []
-    lp = []
-    lo = []
-    lc = []
-    non_idx = []
-    # print(point_cloud_o3d)  #geometry::PointCloud with 10000 points.
-    print(length)  # 10000
-    for i in range(length):
-        # search_knn_vector_3d， input[point，x]      returns [int, open3d.utility.IntVector, open3d.utility.DoubleVector]
-        [_, idx, _] = pcd_tree.search_radius_vector_3d(pcd.points[i], size)
-        # asarray is the same as array  but asarray will save the memeory
-        k_nearest_point = np.asarray(pcd.points)[idx,
-                          :]  # find the surrounding points for each point, set them as a curve and use PCA to find the normal
-        lamb, v = PCA(k_nearest_point)
-        if len(k_nearest_point) == 1:
-            non_idx.append(i)  # record the index that has no knn point
-            p = 0
-            o = 0
-            c = 0
-        else:
-            p = (lamb[1] - lamb[2]) / lamb[0]  # calculate features based on eigenvalues
-            o = pow(lamb[0] * lamb[1] * lamb[2], 1.0 / 3.0)
-            c = lamb[2] / sum(lamb)
-        normals.append(v[:, 1])
-        llambda.append(lamb)
-        lp.append(p)
-        lo.append(o)
-        lc.append(c)
-    return np.array(normals), np.array(llambda), np.array(lp).reshape(length, -1), np.array(lo).reshape(length,
-                                                                                                        -1), np.array(
-        lc).reshape(length, -1), np.array(non_idx)
-
-
-def downsamplingPCD(pcd, dataset):
-    # Downsample
-    downpcd = pcd.voxel_down_sample(voxel_size=0.05)
-    downsampled_points = np.asarray(downpcd.points)
-    downsampled_labels = np.asarray(downpcd.get_point_attr("labels"))
-
-    # Update dataset
-    dataset.room_points = [downsampled_points]
-    dataset.room_labels = [downsampled_labels]
-    dataset.room_idxs = np.array([0])
-
-    # Update pcd after downsampling
-    all_points = np.vstack(dataset.room_points)
-    all_labels = np.concatenate(dataset.room_labels)
-    pcd_update = o3d.geometry.PointCloud(o3ddevice)
-    pcd_update.points = o3d.utility.Vector3dVector(all_points)
-
-    return pcd_update, all_points, all_labels, dataset
-
-
-def createPCD(dataset):
-    # Concatenate room_points and room_labels from all rooms
-    all_points = np.vstack(dataset.room_points)
-    all_labels = np.concatenate(dataset.room_labels)
-
-    # Create an Open3D point cloud object
-    pcd = o3d.geometry.PointCloud()
-
-    # Set the point positions using all_points
-    pcd.points = o3d.utility.Vector3dVector(all_points)
-
-    # Set the point labels using all_labels
-    all_labels_np = all_labels.reshape(-1, 1)  # Reshape the labels to have shape (N, 1)
-
-    # Create a tensor for point labels and assign it to the custom attribute 'labels'
-    labels_tensor = o3d.core.Tensor(all_labels_np, dtype=o3d.core.Dtype.Int32)
-    pcd.set_point_attr("labels", labels_tensor)
-
-    return pcd, all_points, all_labels
 
 
 class TestCustomDataset():
@@ -251,8 +168,7 @@ class TestCustomDataset():
                 normlized_xyz[:, 2] = data_batch[:, 2] / coord_max[2]
                 data_batch[:, 0] = data_batch[:, 0] - (s_x + self.block_size / 2.0)
                 data_batch[:, 1] = data_batch[:, 1] - (s_y + self.block_size / 2.0)
-                data_batch = np.concatenate((data_batch, lp[point_idxs, :], lo[point_idxs, :], lc[point_idxs, :]),
-                                            axis=1)
+                data_batch = np.concatenate((data_batch, lp[point_idxs, :], lo[point_idxs, :], lc[point_idxs, :]),axis=1)
                 label_batch = labels[point_idxs].astype(int)
                 batch_weight = self.labelweights[label_batch]
 
@@ -271,65 +187,51 @@ class TestCustomDataset():
     def __len__(self):
         return len(self.scene_points_list)
 
+
     def filtered_indices(self):
         total_indices = set(range(len(self.room_points)))
         non_index_set = set(self.non_index)
         filtered_indices = list(total_indices - non_index_set)
         return filtered_indices
 
-    def filtered_update(self, filtered_indices):
-        self.room_points = [self.room_points[i] for i in filtered_indices]
-        self.room_labels = [self.room_labels[i] for i in filtered_indices]
-        self.room_coord_min = [self.room_coord_min[i] for i in filtered_indices]
-        self.room_coord_max = [self.room_coord_max[i] for i in filtered_indices]
+    def index_update(self, newIndices):
+        new_room_idxs = []
 
-        index_mapping = {old_idx: new_idx for new_idx, old_idx in enumerate(filtered_indices)}
-        new_room_idxs = [index_mapping[old_idx] for old_idx in self.room_idxs if old_idx in index_mapping]
-        self.room_idxs = np.array(new_room_idxs)
+        for idx in newIndices:
+            new_room_coord_max.append(self.room_coord_max[idx])
+            num_points = len(self.room_points[idx])
+            new_room_idxs.extend([len(new_room_points) - 1] * num_points)
+
+        self.room_idxs = new_room_idxs
+
+    def copy(self, indices=None):
+        copied_dataset = TrainCustomDataset()
+        copied_dataset.num_point = self.num_point
+        copied_dataset.block_size = self.block_size
+        copied_dataset.transform = self.transform
+        copied_dataset.room_points = self.room_points.copy()
+        copied_dataset.room_labels = self.room_labels.copy()
+        copied_dataset.room_coord_min = self.room_coord_min.copy()
+        copied_dataset.room_coord_max = self.room_coord_max.copy()
+
+        if indices is not None:
+            copied_dataset.room_idxs = self.room_idxs[indices]
+        else:
+            copied_dataset.room_idxs = self.room_idxs.copy()
+
+        print("Totally {} samples in dataset.".format(len(copied_dataset.room_idxs)))
+        return copied_dataset
 
     def save_data(self, file_path):
-        with h5py.File(file_path, 'w') as f:
-            # Save room points, labels, and additional attributes
-            for i, (points, labels) in enumerate(zip(self.room_points, self.room_labels)):
-                f.create_dataset(f'room_points/{i}', data=points)
-                f.create_dataset(f'room_labels/{i}', data=labels)
+        with open(file_path, 'wb') as f:
+            pickle.dump(self, f)
 
-            # Save filtered room points and labels
-            for i, (points, labels) in enumerate(zip(self.filtered_room_points, self.filtered_room_labels)):
-                f.create_dataset(f'filtered_room_points/{i}', data=points)
-                f.create_dataset(f'filtered_room_labels/{i}', data=labels)
-
-            # Save additional features
-            f.create_dataset('eigenNorm', data=self.eigenNorm)
-            f.create_dataset('llambda', data=self.llambda)
-            f.create_dataset('lp', data=self.lp)
-            f.create_dataset('lo', data=self.lo)
-            f.create_dataset('lc', data=self.lc)
-            f.create_dataset('non_index', data=self.non_index)
-
-    # @staticmethod
+    @staticmethod
     def load_data(file_path):
-        dataset = CustomDataset()  # Initialize with default or placeholder parameters
-        with h5py.File(file_path, 'r') as f:
-            # Load room points, labels, and additional attributes
-            dataset.room_points = [f[f'room_points/{i}'][()] for i in range(len(f['room_points']))]
-            dataset.room_labels = [f[f'room_labels/{i}'][()] for i in range(len(f['room_labels']))]
-
-            # Load filtered room points and labels
-            dataset.filtered_room_points = [f[f'filtered_room_points/{i}'][()] for i in
-                                            range(len(f['filtered_room_points']))]
-            dataset.filtered_room_labels = [f[f'filtered_room_labels/{i}'][()] for i in
-                                            range(len(f['filtered_room_labels']))]
-
-            # Load additional features
-            dataset.eigenNorm = f['eigenNorm'][()]
-            dataset.llambda = f['llambda'][()]
-            dataset.lp = f['lp'][()]
-            dataset.lo = f['lo'][()]
-            dataset.lc = f['lc'][()]
-            dataset.non_index = f['non_index'][()]
-
+        with open(file_path, 'rb') as f:
+            dataset = pickle.load(f)
         return dataset
+
 
 
 def main(args):
