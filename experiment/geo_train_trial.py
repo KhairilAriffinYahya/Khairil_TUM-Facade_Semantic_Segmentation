@@ -32,7 +32,7 @@ print("Check current time")
 CurrentTime(timezone)
 saveTrain = "geo_traindata.pkl"
 saveEval = "geo_evaldata.pkl"
-saveDir = "/data/"
+saveDir = "/content/Khairil_PN2_experiment/experiment/data/saved_data"
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 # 0: wall, # 1: window, # 2: door, # 3: molding, # 4: other, # 5: terrain, # 6: column, # 7: arch
 classes = ["wall", "window",  "door",  "molding", "other", "terrain", "column", "arch"]
