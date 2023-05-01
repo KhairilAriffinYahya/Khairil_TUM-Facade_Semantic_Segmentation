@@ -107,9 +107,6 @@ class TestCustomDataset():
         labelweights = labelweights / np.sum(labelweights)
         self.labelweights = np.power(np.amax(labelweights) / labelweights, 1 / 3.0)
 
-        print("Scene points number length = %" %len(self.scene_points_num))
-        print("Total number of points = %" %len(self.scene_points_list))
-
 
     def __getitem__(self, index):
         point_set_ini = self.scene_points_list[index]
