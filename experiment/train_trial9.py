@@ -73,7 +73,7 @@ def parse_args():
 
 
 class TrainCustomDataset(Dataset):
-    def __init__(self, las_file_list=None, num_classes=8, num_point=4096, block_size=1.0, sample_rate=1.0, transform=None, indices=None):
+    def __init__(self, las_file_list=None, num_classes=8, num_point=4096, block_size=1.0, sample_rate=1.0, transform=None):
         super().__init__()
         self.num_point = num_point
         self.block_size = block_size
@@ -164,7 +164,8 @@ class TrainCustomDataset(Dataset):
             center = points[np.random.choice(N_points)][:3]
             block_min = center - [self.block_size / 2.0, self.block_size / 2.0, 0]
             block_max = center + [self.block_size / 2.0, self.block_size / 2.0, 0]
-            point_idxs = np.where((points[:, 0] >= block_min[0]) & (points[:, 0] <= block_max[0]) & (points[:, 1] >= block_min[1]) & (points[:, 1] <= block_max[1]))[0]
+            point_idxs = np.where((points[:, 0] >= block_min[0]) & (points[:, 0] <= block_max[0]) & 
+                              (points[:, 1] >= block_min[1]) & (points[:, 1] <= block_max[1]))[0]
             if point_idxs.size > 1024:
                 break
 
@@ -292,32 +293,30 @@ def main(args):
 
     '''Load Dataset'''
     if args.load is False:
+        datasetTime = time.time()
         lidar_dataset = TrainCustomDataset(las_file_list, num_classes=NUM_CLASSES, num_point=NUM_POINT, transform=None)
         print("Dataset taken")
 
         # Split the dataset into training and evaluation sets
         train_size = int(train_ratio * len(lidar_dataset))
-        test_size = len(lidar_dataset) - train_size
-        train_indices, test_indices = random_split(range(len(lidar_dataset)), [train_size, test_size])
+        eval_size = len(lidar_dataset) - train_size
+        train_indices, eval_indices = random_split(range(len(lidar_dataset)), [train_size, eval_size])
 
         print("start loading training data ...")
-        #TRAIN_DATASET = TrainCustomDataset(las_file_list, num_classes=NUM_CLASSES, num_point=NUM_POINT, transform=None, indices=train_indices)
         TRAIN_DATASET = lidar_dataset.copy(indices=train_indices)
 
-        timePrint(start)
-        CurrentTime(timezone)
+        print("start loading eval data ...")
+        EVAL_DATASET = lidar_dataset.copy(indices=eval_indices)
 
-        print("start loading test data ...")
-        #TEST_DATASET = TrainCustomDataset(las_file_list, num_classes=NUM_CLASSES, num_point=NUM_POINT, transform=None, indices=test_indices)
-        TEST_DATASET = lidar_dataset.copy(indices=test_indices)
-
-        timePrint(start)
+        timePrint(datasetTime)
         CurrentTime(timezone)
     else:
         print("Load previously saved dataset")
         loadtime=time.time()
         TRAIN_DATASET=TrainCustomDataset.load_data(saveDir+saveTrain)
-        TEST_DATASET=TrainCustomDataset.load_data(saveDir+saveEval)
+        print("Total {} samples in training dataset.".format(len(TRAIN_DATASET)))
+        EVAL_DATASET=TrainCustomDataset.load_data(saveDir+saveEval)
+        print("Total {} samples in evaluation dataset.".format(len(EVAL_DATASET)))
         timePrint(loadtime)
         CurrentTime(timezone)
 
@@ -325,14 +324,14 @@ def main(args):
         print("Save Dataset")
         savetime=time.time()
         TRAIN_DATASET.save_data(saveDir+saveTrain)
-        TEST_DATASET.save_data(saveDir + saveEval)
+        EVAL_DATASET.save_data(saveDir + saveEval)
         timePrint(savetime)
         CurrentTime(timezone)
 
     trainDataLoader = DataLoader(TRAIN_DATASET, batch_size=BATCH_SIZE, shuffle=True, num_workers=10,
                                                   pin_memory=True, drop_last=True,
                                                   worker_init_fn=lambda x: np.random.seed(x + int(time.time())))
-    testDataLoader = DataLoader(TEST_DATASET, batch_size=BATCH_SIZE, shuffle=False, num_workers=10,
+    evalDataLoader = DataLoader(EVAL_DATASET, batch_size=BATCH_SIZE, shuffle=False, num_workers=10,
                                                  pin_memory=True, drop_last=True)
 
     train_labelweights = TRAIN_DATASET.calculate_labelweights()
@@ -341,11 +340,14 @@ def main(args):
     train_weights = torch.Tensor(train_labelweights).cuda()
 
     log_string("The number of training data is: %d" % len(TRAIN_DATASET))
-    log_string("The number of test data is: %d" % len(TEST_DATASET))
+    log_string("The number of eval data is: %d" % len(EVAL_DATASET))
 
-    print("Length of the dataset:", len(TRAIN_DATASET))
+    print("Length of the training dataset:", len(TRAIN_DATASET))
     print("Length of the trainDataLoader:", len(trainDataLoader))
 
+    print("Length of the evaluation dataset:", len(EVAL_DATASET))
+    print("Length of the evalDataLoader:", len(evalDataLoader))
+    
     '''MODEL LOADING'''
     MODEL = importlib.import_module(args.model)
     shutil.copy('models/%s.py' % args.model, str(experiment_dir))
@@ -396,7 +398,7 @@ def main(args):
     CurrentTime(timezone)
 
     accuracyChart = modelTraining(start_epoch, args.epoch, args.learning_rate, args.lr_decay, args.step_size, BATCH_SIZE,
-                                  NUM_POINT, NUM_CLASSES,trainDataLoader, testDataLoader, classifier, optimizer, criterion,
+                                  NUM_POINT, NUM_CLASSES,trainDataLoader, evalDataLoader, classifier, optimizer, criterion,
                                   train_weights, checkpoints_dir, model_name, seg_label_to_cat, logger)
 
     return accuracyChart

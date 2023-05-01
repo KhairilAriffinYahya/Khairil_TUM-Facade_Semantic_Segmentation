@@ -69,11 +69,9 @@ class TestCustomDataset():
         self.stride = stride
         self.num_classes = num_classes
 
-        self.scene_points_num = []
         self.scene_points_list = []
         self.semantic_labels_list = []
         self.room_coord_min, self.room_coord_max = [], []
-        self.labelweights = np.zeros((num_classes,))
 
         if las_file_list is None:
             return
@@ -104,16 +102,6 @@ class TestCustomDataset():
             coord_min, coord_max = np.amin(points, axis=0)[:3], np.amax(points, axis=0)[:3]
             self.room_coord_min.append(coord_min), self.room_coord_max.append(coord_max)
         assert len(self.scene_points_list) == len(self.semantic_labels_list)
-
-        labelweights = np.zeros(num_classes)
-        for seg in self.semantic_labels_list:
-            tmp, _ = np.histogram(seg, range(range_class))
-            self.scene_points_num.append(seg.shape[0])
-            labelweights += tmp
-        labelweights = labelweights.astype(np.float32)
-        labelweights = labelweights / np.sum(labelweights)
-        self.labelweights = np.power(np.amax(labelweights) / labelweights, 1 / 3.0)
-
 
     def __getitem__(self, index):
         point_set_ini = self.scene_points_list[index]
@@ -167,7 +155,7 @@ class TestCustomDataset():
 
     def calculate_labelweights(self):
         print("Calculate Weights")
-        num_classes = len(self.labelweights)
+        num_classes = self.num_classes
         labelweights = np.zeros(num_classes)
         tmp_scene_points_num = []
         for seg in self.semantic_labels_list:
@@ -179,11 +167,11 @@ class TestCustomDataset():
         labelweights = labelweights.astype(np.float32)
         labelweights = labelweights / np.sum(labelweights)  # normalize weights to 1
         labelweights = np.power(np.amax(labelweights) / labelweights, 1 / 3.0)  # balance weights
-        self.scene_points_num = tmp_scene_points_num
 
         print(labelweights)
+        assert len(labelweights) == num_classes
 
-        return labelweights
+        return labelweights, tmp_scene_points_num
 
     def copy(self, new_indices):
         new_dataset = TestCustomDataset()
@@ -198,20 +186,6 @@ class TestCustomDataset():
 
         new_dataset.scene_points_list = [self.scene_points_list[i] for i in new_indices]
         new_dataset.semantic_labels_list = [self.semantic_labels_list[i] for i in new_indices]
-
-        # Calculate labelweights for new points
-        num_classes = len(self.labelweights)
-        assert num_classes == new_dataset.num_classes
-        labelweights = np.zeros(num_classes)
-        tmp_scene_points_num = []
-        for seg in new_dataset.semantic_labels_list:
-            tmp, _ = np.histogram(seg, range(num_classes + 1))
-            tmp_scene_points_num.append(seg.shape[0])
-            labelweights += tmp
-        labelweights = labelweights.astype(np.float32)
-        labelweights = labelweights / np.sum(labelweights)
-        new_dataset.labelweights = np.power(np.amax(labelweights) / labelweights, 1 / 3.0)
-        new_dataset.scene_points_num = tmp_scene_points_num
 
         return new_dataset
 
