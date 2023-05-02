@@ -173,7 +173,7 @@ class TestCustomDataset():
 
         return labelweights, tmp_scene_points_num
 
-    def copy(self, new_indices):
+    def copy(self, new_indices=None):
         new_dataset = TestCustomDataset()
         new_dataset.block_points = self.block_points
         new_dataset.block_size = self.block_size

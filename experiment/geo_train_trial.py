@@ -71,6 +71,7 @@ def parse_args():
     parser.add_argument('--visualizeModel', type=str, default=False, help='directory to data')
     parser.add_argument('--load', type=bool, default=False, help='load saved data or new')
     parser.add_argument('--save', type=bool, default=False, help='save data')
+    parser.add_argument('--downsample', type=bool, default=False, help='downsample data')
 
     return parser.parse_args()
 
@@ -306,18 +307,11 @@ def main(args):
         print("Dataset taken")
         # Split the dataset into training and evaluation sets
         train_size = int(train_ratio * len(lidar_dataset))
-        test_size = len(lidar_dataset) - train_size
+        eval_size = len(lidar_dataset) - train_size
 
-           # Split the full dataset into train and test sets
-        train_indices, test_indices = random_split(range(len(lidar_dataset)), [train_size, test_size])
-
-        #print("start loading training data ...")
-        #TRAIN_DATASET = TrainCustomDataset(las_file_list, num_classes=NUM_CLASSES, num_point=NUM_POINT, transform=None, indices=train_indices)
-        #custom_dataset.save_data('custom_dataset.pkl')
-        #new_custom_dataset.load_data('custom_dataset.pkl')
-        #print("start loading test data ...")
-        #TEST_DATASET = TrainCustomDataset(las_file_list, num_classes=NUM_CLASSES, num_point=NUM_POINT, transform=None, indices=test_indices)
-
+           # Split the full dataset into train and eval sets
+        train_indices, eval_indices = random_split(range(len(lidar_dataset)), [train_size, eval_size])
+        
         print("start loading training data ...")
         TRAIN_DATASET = lidar_dataset.copy(indices=train_indices)
 
@@ -330,9 +324,10 @@ def main(args):
         pcd_train, train_points, train_labels = createPCD(TRAIN_DATASET)
 
         #Downsampling
-        #pcd_train, train_points, train_labels, TRAIN_DATASET = downsamplingPCD(pcd_train, TRAIN_DATASET)
-        #print("downsampled room_idx training")
-        #print(TRAIN_DATASET.room_idxs)
+        if args.downsample is True:
+            pcd_train, train_points, train_labels, TRAIN_DATASET = downsamplingPCD(pcd_train, TRAIN_DATASET)
+            print("downsampled room_idx training")
+            print(TRAIN_DATASET.room_idxs)
 
         # Visualization
         if args.visualizeModel is True:
@@ -344,19 +339,19 @@ def main(args):
         #Geometric Feature Addition
         # add features, normals, lambda, p, o, c, radius is 0.8m
         train_total_len = len(TRAIN_DATASET)
-        eigenNorm, llambda, lp, lo, lc, non_index = collFeatures(pcd_train, train_total_len)
+        t_eigenNorm, t_llambda, t_lp, t_lo, t_lc, t_non_index = collFeatures(pcd_train, train_total_len)
 
 
         print("eigenvector len = %" %len(eigenNorm))
         print("non-index = %" %len(non_index))
 
         # Store the additional features in the CustomDataset instance
-        TRAIN_DATASET.eigenNorm = eigenNorm
-        TRAIN_DATASET.llambda = llambda
-        TRAIN_DATASET.lp = lp
-        TRAIN_DATASET.lo = lo
-        TRAIN_DATASET.lc = lc
-        TRAIN_DATASET.non_index = non_index
+        TRAIN_DATASET.eigenNorm = t_eigenNorm
+        TRAIN_DATASET.llambda = t_llambda
+        TRAIN_DATASET.lp = t_lp
+        TRAIN_DATASET.lo = t_lo
+        TRAIN_DATASET.lc = t_lc
+        TRAIN_DATASET.non_index = t_non_index
 
         # Filter the points and labels using the non_index variable
         if len(non_index) != 0:
@@ -373,52 +368,53 @@ def main(args):
 
         # Evaluation DATASET
         print("start loading evalaution data ...")
-        TEST_DATASET = lidar_dataset.copy(indices=test_indices)
+        EVAL_DATASET = lidar_dataset.copy(indices=eval_indices)
 
 
         print("room_idx evaluation")
-        print(TEST_DATASET.room_idxs)
-        print(len(TEST_DATASET))
+        print(EVAL_DATASET.room_idxs)
+        print(len(EVAL_DATASET))
 
         #Open3D
-        pcd_test, test_points, test_labels = createPCD(TEST_DATASET)
+        pcd_eval, eval_points, eval_labels = createPCD(EVAL_DATASET)
 
         #Downsampling
-        #pcd_test, test_points, test_labels, TRAIN_DATASET = downsamplingPCD(pcd_test, TRAIN_DATASET)
-        #print("downsampled room_idx evaluation")
-        #print(TEST_DATASET.room_idxs)
+        if args.downsample is True:
+            pcd_eval, eval_points, eval_labels, TRAIN_DATASET = downsamplingPCD(pcd_eval, TRAIN_DATASET)
+            print("downsampled room_idx evaluation")
+            print(EVAL_DATASET.room_idxs)
 
         # Visualization
         if args.visualizeModel is True:
-            colors = plt.get_cmap("tab20")(np.array(test_labels).reshape(-1) / 17.0)
+            colors = plt.get_cmap("tab20")(np.array(eval_labels).reshape(-1) / 17.0)
             colors = colors[:, 0:3]
-            pcd_test.colors = o3d.utility.Vector3dVector(colors)
-            o3d.visualization.draw_geometries([pcd_test], window_name='test the color', width=800, height=600)
+            pcd_eval.colors = o3d.utility.Vector3dVector(colors)
+            o3d.visualization.draw_geometries([pcd_eval], window_name='test the color', width=800, height=600)
 
         #Geometric Feature Addition
         # add features, normals, lambda, p, o, c, radius is 0.8m
-        test_total_len = len(TEST_DATASET)
-        eigenNorm, llambda, lp, lo, lc, non_index = collFeatures(pcd_test, test_total_len)
+        eval_total_len = len(EVAL_DATASET)
+        e_eigenNorm, e_llambda, e_lp, e_lo, e_lc, e_non_index = collFeatures(pcd_eval, eval_total_len)
 
         print("eigenvector len = %" %len(eigenNorm))
         print("non-index = %" %len(non_index))
 
         # Store the additional features in the CustomDataset instance
-        TEST_DATASET.eigenNorm = eigenNorm
-        TEST_DATASET.llambda = llambda
-        TEST_DATASET.lp = lp
-        TEST_DATASET.lo = lo
-        TEST_DATASET.lc = lc
-        TEST_DATASET.non_index = non_index
+        EVAL_DATASET.eigenNorm = e_eigenNorm
+        EVAL_DATASET.llambda = e_llambda
+        EVAL_DATASET.lp = e_lp
+        EVAL_DATASET.lo = e_lo
+        EVAL_DATASET.lc = e_lc
+        EVAL_DATASET.non_index = e_non_index
 
         # Filter the points and labels using the non_index variable
         if len(non_index) != 0:
-            filtered_indices = TEST_DATASET.filtered_indices()
-            TEST_DATASET.index_update(filtered_indices)
+            filtered_indices = EVAL_DATASET.filtered_indices()
+            EVAL_DATASET.index_update(filtered_indices)
 
         print("geometric room_idx evaluation")
-        print(TEST_DATASET.room_idxs)
-        print(len(TEST_DATASET))
+        print(EVAL_DATASET.room_idxs)
+        print(len(EVAL_DATASET))
 
         timePrint(start)
         CurrentTime(timezone)
@@ -427,7 +423,7 @@ def main(args):
         print("Load previously saved dataset")
         loadtime = time.time()
         TRAIN_DATASET = TrainCustomDataset.load_data(saveDir + saveTrain)
-        TEST_DATASET = TrainCustomDataset.load_data(saveDir + saveEval)
+        EVAL_DATASET = TrainCustomDataset.load_data(saveDir + saveEval)
         timePrint(loadtime)
         CurrentTime(timezone)
 
@@ -435,14 +431,14 @@ def main(args):
         print("Save Dataset")
         savetime = time.time()
         TRAIN_DATASET.save_data(saveDir + saveTrain)
-        TEST_DATASET.save_data(saveDir + saveEval)
+        EVAL_DATASET.save_data(saveDir + saveEval)
         timePrint(savetime)
         CurrentTime(timezone)
 
     trainDataLoader = DataLoader(TRAIN_DATASET, batch_size=BATCH_SIZE, shuffle=True, num_workers=10,
                                                   pin_memory=True, drop_last=True,
                                                   worker_init_fn=lambda x: np.random.seed(x + int(time.time())))
-    testDataLoader = DataLoader(TEST_DATASET, batch_size=BATCH_SIZE, shuffle=False, num_workers=10,
+    evalDataLoader = DataLoader(EVAL_DATASET, batch_size=BATCH_SIZE, shuffle=False, num_workers=10,
                                                  pin_memory=True, drop_last=True)
 
     print("wall", "window", "door", "molding", "other", "terrain", "column", "arch")
@@ -450,7 +446,7 @@ def main(args):
 
     train_weights = torch.Tensor(train_labelweights).cuda()
     log_string("The number of training data is: %d" % len(TRAIN_DATASET))
-    log_string("The number of test data is: %d" % len(TEST_DATASET))
+    log_string("The number of eval data is: %d" % len(EVAL_DATASET))
 
     print("Length of the dataset:", len(TRAIN_DATASET))
     print("Length of the trainDataLoader:", len(trainDataLoader))
@@ -511,7 +507,7 @@ def main(args):
     CurrentTime(timezone)
 
     accuracyChart = modelTraining(start_epoch, args.epoch, args.learning_rate, args.lr_decay, args.step_size, BATCH_SIZE,
-                                  NUM_POINT, NUM_CLASSES,trainDataLoader, testDataLoader, classifier, optimizer, criterion,
+                                  NUM_POINT, NUM_CLASSES,trainDataLoader, evalDataLoader, classifier, optimizer, criterion,
                                   train_weights, checkpoints_dir, model_name, seg_label_to_cat, logger)
 
     return accuracyChart

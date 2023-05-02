@@ -57,6 +57,9 @@ def parse_args():
     parser.add_argument('--output_model', type=str, default='/best_model.pth', help='model output name')
     parser.add_argument('--rootdir', type=str, default='/content/drive/MyDrive/ data/tum/tum-facade/training/selected/', help='directory to data')
     parser.add_argument('--visualizeModel', type=str, default=False, help='directory to data')
+    parser.add_argument('--load', type=bool, default=False, help='load saved data or new')
+    parser.add_argument('--save', type=bool, default=False, help='save data')
+    parser.add_argument('--downsample', type=bool, default=False, help='downsample data')
 
     return parser.parse_args()
 
@@ -123,15 +126,6 @@ class TestCustomDataset():
             self.room_coord_min.append(coord_min), self.room_coord_max.append(coord_max)
         assert len(self.scene_points_list) == len(self.semantic_labels_list)
 
-        labelweights = np.zeros(num_classes)
-        for seg in self.semantic_labels_list:
-            tmp, _ = np.histogram(seg, range(range_class))
-            self.scene_points_num.append(seg.shape[0])
-            labelweights += tmp
-        labelweights = labelweights.astype(np.float32)
-        labelweights = labelweights / np.sum(labelweights)
-        self.labelweights = np.power(np.amax(labelweights) / labelweights, 1 / 3.0)
-
     def __getitem__(self, index):
         point_set_ini = self.scene_points_list[index]
         points = point_set_ini[:, :3]
@@ -197,32 +191,53 @@ class TestCustomDataset():
         return filtered_indices
 
     def index_update(self, newIndices):
-        new_room_idxs = []
-
-        for idx in newIndices:
-            new_room_coord_max.append(self.room_coord_max[idx])
-            num_points = len(self.room_points[idx])
-            new_room_idxs.extend([len(new_room_points) - 1] * num_points)
-
         self.room_idxs = new_room_idxs
 
-    def copy(self, indices=None):
-        copied_dataset = TrainCustomDataset()
-        copied_dataset.num_point = self.num_point
-        copied_dataset.block_size = self.block_size
-        copied_dataset.transform = self.transform
-        copied_dataset.room_points = self.room_points.copy()
-        copied_dataset.room_labels = self.room_labels.copy()
-        copied_dataset.room_coord_min = self.room_coord_min.copy()
-        copied_dataset.room_coord_max = self.room_coord_max.copy()
+    def copy(self, new_indices=None):
+        new_dataset = TestCustomDataset()
+        new_dataset.block_points = self.block_points
+        new_dataset.block_size = self.block_size
+        new_dataset.padding = self.padding
+        new_dataset.file_list = self.file_list
+        new_dataset.stride = self.stride
+        new_dataset.num_classes = self.num_classes
+        new_dataset.room_coord_min = self.room_coord_min
+        new_dataset.room_coord_max = self.room_coord_max
+        new_dataset.eigenNorm = self.eigenNorm
+        new_dataset.llambda = self.llambda
+        new_dataset.lp = self.lp
+        new_dataset.lo = self.lo
+        new_dataset.lc = self.lc
+        new_dataset.non_index = self.non_index
+        
+        new_dataset.scene_points_list = [self.scene_points_list[i] for i in new_indices]
+        new_dataset.semantic_labels_list = [self.semantic_labels_list[i] for i in new_indices]
 
-        if indices is not None:
-            copied_dataset.room_idxs = self.room_idxs[indices]
-        else:
-            copied_dataset.room_idxs = self.room_idxs.copy()
+        assert len(new_dataset.scene_points_list) == len(new_dataset.semantic_labels_list)
 
-        print("Totally {} samples in dataset.".format(len(copied_dataset.room_idxs)))
-        return copied_dataset
+        return new_dataset
+
+
+
+    def calculate_labelweights(self):
+        print("Calculate Weights")
+        num_classes = self.num_classes
+        labelweights = np.zeros(num_classes)
+        tmp_scene_points_num = []
+        for seg in self.semantic_labels_list:
+            tmp, _ = np.histogram(seg, range(num_classes + 1))
+            tmp_scene_points_num.append(seg.shape[0])
+            labelweights += tmp
+
+        print(labelweights)
+        labelweights = labelweights.astype(np.float32)
+        labelweights = labelweights / np.sum(labelweights)  # normalize weights to 1
+        labelweights = np.power(np.amax(labelweights) / labelweights, 1 / 3.0)  # balance weights
+
+        print(labelweights)
+        assert len(labelweights) == num_classes
+
+        return labelweights, tmp_scene_points_num
 
     def save_data(self, file_path):
         with open(file_path, 'wb') as f:
@@ -272,6 +287,7 @@ def main(args):
 
     test_file = glob.glob(root + args.test_area )
 
+    testdatatime = time.time()
     print("start loading test data ...")
     TEST_DATASET_WHOLE_SCENE = TestCustomDataset(root, test_file, num_classes=NUM_CLASSES, block_points=NUM_POINT)
     log_string("The number of test data is: %d" % len(TEST_DATASET_WHOLE_SCENE))
@@ -320,15 +336,8 @@ def main(args):
     print(TEST_DATASET_WHOLE_SCENE.room_idxs)
     print(len(TEST_DATASET_WHOLE_SCENE))
 
-    TestTime = time.time()
-    timetaken = TestTime-start
-    sec = timetaken%60
-    t1 = timetaken/60
-    mint = t1%60
-    hour = t1/60
-
-    print("Time taken to load test = %i:%i:%i" % (hour, mint, sec))
-
+    timePrint(testdatatime)
+    CurrentTime(timezone)
 
     '''MODEL LOADING'''
     model_name = args.output_model
