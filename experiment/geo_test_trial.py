@@ -23,7 +23,7 @@ timezone = pytz.timezone('Asia/Singapore')
 print("Check current time")
 CurrentTime(timezone)
 saveTest = "geo_testdata.pkl"
-saveDir = "/content/Khairil_PN2_experiment/experiment/data/saved_data"
+saveDir = "/content/Khairil_PN2_experiment/experiment/data/saved_data/"
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 # 0: wall, # 1: window, # 2: door, # 3: molding, # 4: other, # 5: terrain, # 6: column, # 7: arch
 classes = ["wall", "window",  "door",  "molding", "other", "terrain", "column", "arch"]
@@ -256,7 +256,13 @@ def main(args):
         logger.info(str)
         print(str)
 
+
+    '''Initialize'''
     root = args.rootdir
+    BATCH_SIZE = args.batch_size
+    NUM_POINT = args.num_point
+    savetest_path = saveDir+saveTest
+    test_file = glob.glob(root + args.test_area )
     
     '''HYPER PARAMETER'''
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
@@ -282,63 +288,72 @@ def main(args):
     log_string('PARAMETER ...')
     log_string(args)
 
-    BATCH_SIZE = args.batch_size
-    NUM_POINT = args.num_point
-
-    test_file = glob.glob(root + args.test_area )
-
+    
+    '''Dataset'''
     testdatatime = time.time()
-    print("start loading test data ...")
-    TEST_DATASET_WHOLE_SCENE = TestCustomDataset(root, test_file, num_classes=NUM_CLASSES, block_points=NUM_POINT)
-    log_string("The number of test data is: %d" % len(TEST_DATASET_WHOLE_SCENE))
 
-    print("room_idx evaluation")
-    print(TEST_DATASET_WHOLE_SCENE.room_idxs)
-    print(len(TEST_DATASET_WHOLE_SCENE))
+    if args.load is False:
+        print("start loading test data ...")
+        TEST_DATASET_WHOLE_SCENE = TestCustomDataset(root, test_file, num_classes=NUM_CLASSES, block_points=NUM_POINT)
+        log_string("The number of test data is: %d" % len(TEST_DATASET_WHOLE_SCENE))
 
-    #Open3D
-    pcd_test, test_points, test_labels = createPCD(TEST_DATASET_WHOLE_SCENE)
+        print("room_idx evaluation")
+        print(TEST_DATASET_WHOLE_SCENE.room_idxs)
+        print(len(TEST_DATASET_WHOLE_SCENE))
 
-    #Downsampling
-    #pcd_test, test_points, test_labels, TRAIN_DATASET = downsamplingPCD(pcd_test, TRAIN_DATASET)
-    print("downsampled room_idx evaluation")
-    print(TEST_DATASET_WHOLE_SCENE.room_idxs)
+        #Open3D
+        pcd_test, test_points, test_labels = createPCD(TEST_DATASET_WHOLE_SCENE)
 
-    # Visualization
-    if args.visualizeModel is True:
-        colors = plt.get_cmap("tab20")(np.array(test_labels).reshape(-1) / 17.0)
-        colors = colors[:, 0:3]
-        pcd_test.colors = o3d.utility.Vector3dVector(colors)
-        o3d.visualization.draw_geometries([pcd_test], window_name='test the color', width=800, height=600)
+        #Downsampling
+        if args.downsample is True:
+            pcd_test, test_points, test_labels, TRAIN_DATASET = downsamplingPCD(pcd_test, TRAIN_DATASET)
+            print("downsampled room_idx evaluation")
+            print(TEST_DATASET_WHOLE_SCENE.room_idxs)
 
-    #Geometric Feature Addition
-    # add features, normals, lambda, p, o, c, radius is 0.8m
-    test_total_len = len(TEST_DATASET_WHOLE_SCENE)
-    eigenNorm, llambda, lp, lo, lc, non_index = collFeatures(pcd_test, test_total_len)
+        # Visualization
+        if args.visualizeModel is True:
+            colors = plt.get_cmap("tab20")(np.array(test_labels).reshape(-1) / 17.0)
+            colors = colors[:, 0:3]
+            pcd_test.colors = o3d.utility.Vector3dVector(colors)
+            o3d.visualization.draw_geometries([pcd_test], window_name='test the color', width=800, height=600)
 
-    print("eigenvector len = %" %len(eigenNorm))
-    print("non-index = %" %len(non_index))
+        #Geometric Feature Addition
+        # add features, normals, lambda, p, o, c, radius is 0.8m
+        test_total_len = len(TEST_DATASET_WHOLE_SCENE)
+        eigenNorm, llambda, lp, lo, lc, non_index = collFeatures(pcd_test, test_total_len)
 
-    # Store the additional features in the CustomDataset instance
-    TEST_DATASET_WHOLE_SCENE.eigenNorm = eigenNorm
-    TEST_DATASET_WHOLE_SCENE.llambda = llambda
-    TEST_DATASET_WHOLE_SCENE.lp = lp
-    TEST_DATASET_WHOLE_SCENE.lo = lo
-    TEST_DATASET_WHOLE_SCENE.lc = lc
-    TEST_DATASET_WHOLE_SCENE.non_index = non_index
+        print("eigenvector len = %" %len(eigenNorm))
+        print("non-index = %" %len(non_index))
 
-    # Filter the points and labels using the non_index variable
-    if len(non_index) != 0:
-        filtered_indices = TEST_DATASET.filtered_indices()
-        TEST_DATASET_WHOLE_SCENE.filtered_update(filtered_indices)
+        # Store the additional features in the CustomDataset instance
+        TEST_DATASET_WHOLE_SCENE.eigenNorm = eigenNorm
+        TEST_DATASET_WHOLE_SCENE.llambda = llambda
+        TEST_DATASET_WHOLE_SCENE.lp = lp
+        TEST_DATASET_WHOLE_SCENE.lo = lo
+        TEST_DATASET_WHOLE_SCENE.lc = lc
+        TEST_DATASET_WHOLE_SCENE.non_index = non_index
 
-    print("geometric room_idx evaluation")
-    print(TEST_DATASET_WHOLE_SCENE.room_idxs)
-    print(len(TEST_DATASET_WHOLE_SCENE))
+        # Filter the points and labels using the non_index variable
+        if len(non_index) != 0:
+            filtered_indices = TEST_DATASET.filtered_indices()
+            TEST_DATASET_WHOLE_SCENE.filtered_update(filtered_indices)
+
+        print("geometric room_idx evaluation")
+        print(TEST_DATASET_WHOLE_SCENE.room_idxs)
+        print(len(TEST_DATASET_WHOLE_SCENE))
+      else:
+        TEST_DATASET_WHOLE_SCENE = TestCustomDataset.load_data(saveDir+saveTest)
 
     timePrint(testdatatime)
     CurrentTime(timezone)
 
+    if args.save is True:
+        print("Save Test dataset")
+        savetesttime = time.time()
+        TEST_DATASET_WHOLE_SCENE.save(saveDir+saveTest)
+        timePrint(savetesttime)
+        CurrentTime(timezone)
+        
     '''MODEL LOADING'''
     model_name = args.output_model
     tmp_model = args.model

@@ -30,7 +30,7 @@ print("Check current time")
 CurrentTime(timezone)
 saveTrain = "8cla_traindata.pkl"
 saveEval = "8cla_evaldata.pkl"
-saveDir = "/content/Khairil_PN2_experiment/experiment/data/saved_data"
+saveDir = "/content/Khairil_PN2_experiment/experiment/data/saved_data/"
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 # 0: wall, # 1: window, # 2: door, # 3: molding, # 4: other, # 5: terrain, # 6: column, # 7: arch
 classes = ["wall", "window",  "door",  "molding", "other", "terrain", "column", "arch"]
@@ -132,25 +132,6 @@ class TrainCustomDataset(Dataset):
         for index in range(len(rooms)):
             room_idxs.extend([index] * int(round(sample_prob[index] * num_iter)))
         self.room_idxs = np.array(room_idxs)
-
-        if indices is not None:
-            self.room_idxs = self.room_idxs[indices]
-
-            print("Calcualate Weights")
-            # Calculate labelweights for the selected subset
-            labelweights = np.zeros(adjustedclass)
-            print("len = %f" % len(self.room_idxs))
-            for room_idx in self.room_idxs:
-                labels = self.room_labels[room_idx]
-                tmp, _ = np.histogram(labels, range(range_class))
-                labelweights += tmp
-
-        print("wall", "window", "door", "molding", "other", "terrain", "column", "arch")
-        print(labelweights)
-        labelweights = labelweights.astype(np.float32)
-        labelweights = labelweights / np.sum(labelweights)
-        self.labelweights = np.power(np.amax(labelweights) / labelweights, 1 / 3.0)
-        print(self.labelweights)
 
         print("Totally {} samples in dataset.".format(len(self.room_idxs)))
 
