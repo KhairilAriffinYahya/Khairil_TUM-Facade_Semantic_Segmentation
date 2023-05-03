@@ -56,7 +56,7 @@ def parse_args():
     parser.add_argument('--num_votes', type=int, default=5, help='aggregate segmentation scores with voting [default: 5]')
     parser.add_argument('--model', type=str, default='pointnet2_sem_seg_geo_trial', help='model name [default: pointnet_sem_seg]')
     parser.add_argument('--output_model', type=str, default='/best_model.pth', help='model output name')
-    parser.add_argument('--rootdir', type=str, default='/content/Khairil_PN2_experiment/experiment/test_data/CC/', help='directory to data')
+    parser.add_argument('--rootdir', type=str, default='/content/drive/MyDrive/ data/tum/tum-facade/training/cc_selected/', help='directory to data')
     parser.add_argument('--load', type=bool, default=False, help='load saved data or new')
     parser.add_argument('--save', type=bool, default=False, help='save data')
     parser.add_argument('--visualizeModel', type=str, default=False, help='directory to data')
@@ -298,9 +298,13 @@ def main(args):
     
     '''HYPER PARAMETER'''
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
-    tmp_dir = args.exp_dir
-    print(tmp_dir)
+    if args.exp_dir is None:
+        tmp_dir = 'log/sem_seg/'
+    else:
+        tmp_dir = args.exp_dir
+        print(tmp_dir)
     experiment_dir = tmp_dir + args.log_dir
+    print("Logging Directory = " +experiment_dir)
     visual_dir = experiment_dir + '/visual/'
     visual_dir = Path(visual_dir)
     visual_dir.mkdir(exist_ok=True)

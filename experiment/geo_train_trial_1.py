@@ -302,12 +302,18 @@ def main(args):
 
     '''CREATE DIR'''
     timestr = str(datetime.datetime.now().strftime('%Y-%m-%d_%H-%M'))
-    experiment_dir = Path(args.exp_dir)
-    print(experiment_dir)
+    if args.exp_dir is None:
+        experiment_dir = Path('./log/')
+    else:
+        experiment_dir = Path(args.exp_dir)
     experiment_dir.mkdir(exist_ok=True)
     experiment_dir = experiment_dir.joinpath('sem_seg')
     experiment_dir.mkdir(exist_ok=True)
-    experiment_dir = experiment_dir.joinpath(args.log_dir)
+    if args.log_dir is None:
+        experiment_dir = experiment_dir.joinpath(timestr)
+    else:
+        experiment_dir = experiment_dir.joinpath(args.log_dir)
+    print("Logging Directory = " +experiment_dir)
     experiment_dir.mkdir(exist_ok=True)
     checkpoints_dir = experiment_dir.joinpath('checkpoints/')
     checkpoints_dir.mkdir(exist_ok=True)
