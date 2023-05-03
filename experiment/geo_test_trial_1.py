@@ -41,6 +41,7 @@ for i, cat in enumerate(seg_classes.keys()):
 
 print(seg_label_to_cat)
 
+# Adjust parameters here if there no changes to reduce line
 
 def parse_args():
     '''PARAMETERS'''
@@ -51,15 +52,18 @@ def parse_args():
     parser.add_argument('--log_dir', type=str, required=True, help='experiment root')
     parser.add_argument('--exp_dir', type=str, default=None, help='Log path [default: None]')
     parser.add_argument('--visual', action='store_true', default=False, help='visualize result [default: False]')
-    parser.add_argument('--test_area', type=str, default='DEBY_LOD2_4959323.las', help='area for testing, option: 1-6 [default: 5]')
+    parser.add_argument('--test_area', type=str, default='cc_o_DEBY_LOD2_4959323.las', help='area for testing, option: 1-6 [default: 5]')
     parser.add_argument('--num_votes', type=int, default=5, help='aggregate segmentation scores with voting [default: 5]')
-    parser.add_argument('--model', type=str, help='model name [default: pointnet_sem_seg]')
+    parser.add_argument('--model', type=str, default='pointnet2_sem_seg_geo_trial', help='model name [default: pointnet_sem_seg]')
     parser.add_argument('--output_model', type=str, default='/best_model.pth', help='model output name')
-    parser.add_argument('--rootdir', type=str, default='/content/drive/MyDrive/ data/tum/tum-facade/training/selected/', help='directory to data')
-    parser.add_argument('--visualizeModel', type=str, default=False, help='directory to data')
+    parser.add_argument('--rootdir', type=str, default='/content/drive/MyDrive/ data/tum/tum-facade/training/cc_selected/', help='directory to data')
     parser.add_argument('--load', type=bool, default=False, help='load saved data or new')
     parser.add_argument('--save', type=bool, default=False, help='save data')
+    parser.add_argument('--visualizeModel', type=str, default=False, help='directory to data')
     parser.add_argument('--downsample', type=bool, default=False, help='downsample data')
+    parser.add_argument('--calculate_geometry', type=bool, default=False, help='decide where to calculate geometry')
+    parser.add_argument('--geometry_features', type=array, default=['p','o','c'], help='select which geometry_features to add')
+
 
     return parser.parse_args()
 
@@ -85,14 +89,18 @@ class TestCustomDataset():
         self.stride = stride
         self.scene_points_num = []
 
-        # For Geometric Features
-        self.eigenNorm = None
-        self.llambda = None
-        self.lp = None
-        self.lo = None
-        self.lc = None
-        self.non_index = None
+        #For Geometric Features
+        self.lp = []
+        self.lo = []
+        self.lc = []
+        self.non_index = []
 
+
+        # Return early if las_file_list is None
+        if las_file_list is None:
+            self.room_idxs = np.array([])
+            return
+            
         adjustedclass = num_classes
         range_class = adjustedclass + 1
 
@@ -107,7 +115,19 @@ class TestCustomDataset():
             in_file = laspy.read(file_path)
             points = np.vstack((in_file.x, in_file.y, in_file.z)).T
             labels = np.array(in_file.classification, dtype=np.int32)
-
+            print("Labels")
+            print(labels)
+            if calculate_geometry is False:
+                if 'p' in args.geometry_features:
+                    tmp_p = np.array(las_data.planarity, dtype=np.uint8)
+                    self.lp.append(tmp_p)
+                if 'o' in args.geometry_features:
+                    tmp_p = np.array(las_data.omnivariance, dtype=np.uint8)
+                    self.lo.append(tmp_o)
+                if 'c' in args.geometry_features:
+                    tmp_p = np.array(las_data.surface_variation, dtype=np.uint8)
+                    self.lc.append(tmp_c)
+                    
             # Merge labels as per instructions
             labels[(labels == 5) | (labels == 6)] = 6  # Merge molding and decoration
             labels[(labels == 1) | (labels == 9) | (labels == 15) | (
@@ -164,7 +184,21 @@ class TestCustomDataset():
                 normlized_xyz[:, 2] = data_batch[:, 2] / coord_max[2]
                 data_batch[:, 0] = data_batch[:, 0] - (s_x + self.block_size / 2.0)
                 data_batch[:, 1] = data_batch[:, 1] - (s_y + self.block_size / 2.0)
-                data_batch = np.concatenate((data_batch, lp[point_idxs, :], lo[point_idxs, :], lc[point_idxs, :]),axis=1)
+                tmp_geo_feature = []
+                if 'p' in args.geometry_features:
+                    tmp_geo_feature.append(lp[point_idxs, :])
+                if 'o' in args.geometry_features:
+                    tmp_geo_feature.append(lo[point_idxs, :])
+                if 'c' in args.geometry_features:
+                    tmp_geo_feature.append(lc[point_idxs, :])
+                
+                data_batch = np.concatenate((data_batch, lo[point_idxs, :]),axis=1)
+                print(data_batch)
+                if len(tmp_geo_feature) > 0:
+                    geo_feature = np.concatenate(tmp_geo_feature, axis=1)
+                    data_batch = np.concatenate((data_batch, geo_feature), axis=1)
+                    print(data_batch)
+
                 label_batch = labels[point_idxs].astype(int)
                 batch_weight = self.labelweights[label_batch]
 
@@ -203,8 +237,6 @@ class TestCustomDataset():
         new_dataset.num_classes = self.num_classes
         new_dataset.room_coord_min = self.room_coord_min
         new_dataset.room_coord_max = self.room_coord_max
-        new_dataset.eigenNorm = self.eigenNorm
-        new_dataset.llambda = self.llambda
         new_dataset.lp = self.lp
         new_dataset.lo = self.lo
         new_dataset.lc = self.lc
@@ -301,47 +333,46 @@ def main(args):
         print(TEST_DATASET_WHOLE_SCENE.room_idxs)
         print(len(TEST_DATASET_WHOLE_SCENE))
 
-        #Open3D
-        pcd_test, test_points, test_labels = createPCD(TEST_DATASET_WHOLE_SCENE)
+        if calculate_geometry is True:
+            #Open3D
+            pcd_test, test_points, test_labels = createPCD(TEST_DATASET_WHOLE_SCENE)
 
-        #Downsampling
-        if args.downsample is True:
-            pcd_test, test_points, test_labels, TRAIN_DATASET = downsamplingPCD(pcd_test, TRAIN_DATASET)
-            print("downsampled room_idx evaluation")
+            #Downsampling
+            if args.downsample is True:
+                pcd_test, test_points, test_labels, TRAIN_DATASET = downsamplingPCD(pcd_test, TRAIN_DATASET)
+                print("downsampled room_idx evaluation")
+                print(TEST_DATASET_WHOLE_SCENE.room_idxs)
+
+            # Visualization
+            if args.visualizeModel is True:
+                colors = plt.get_cmap("tab20")(np.array(test_labels).reshape(-1) / 17.0)
+                colors = colors[:, 0:3]
+                pcd_test.colors = o3d.utility.Vector3dVector(colors)
+                o3d.visualization.draw_geometries([pcd_test], window_name='test the color', width=800, height=600)
+
+            #Geometric Feature Addition
+            # add features, normals, lambda, p, o, c, radius is 0.8m
+            test_total_len = len(TEST_DATASET_WHOLE_SCENE)
+            eigenNorm, llambda, lp, lo, lc, non_index = collFeatures(pcd_test, test_total_len)
+
+            print("eigenvector len = %" %len(eigenNorm))
+            print("non-index = %" %len(non_index))
+
+            # Store the additional features in the CustomDataset instance
+            TEST_DATASET_WHOLE_SCENE.lp = lp
+            TEST_DATASET_WHOLE_SCENE.lo = lo
+            TEST_DATASET_WHOLE_SCENE.lc = lc
+            TEST_DATASET_WHOLE_SCENE.non_index = non_index
+
+            # Filter the points and labels using the non_index variable
+            if len(non_index) != 0:
+                filtered_indices = TEST_DATASET.filtered_indices()
+                TEST_DATASET_WHOLE_SCENE.filtered_update(filtered_indices)
+
+            print("geometric room_idx evaluation")
             print(TEST_DATASET_WHOLE_SCENE.room_idxs)
-
-        # Visualization
-        if args.visualizeModel is True:
-            colors = plt.get_cmap("tab20")(np.array(test_labels).reshape(-1) / 17.0)
-            colors = colors[:, 0:3]
-            pcd_test.colors = o3d.utility.Vector3dVector(colors)
-            o3d.visualization.draw_geometries([pcd_test], window_name='test the color', width=800, height=600)
-
-        #Geometric Feature Addition
-        # add features, normals, lambda, p, o, c, radius is 0.8m
-        test_total_len = len(TEST_DATASET_WHOLE_SCENE)
-        eigenNorm, llambda, lp, lo, lc, non_index = collFeatures(pcd_test, test_total_len)
-
-        print("eigenvector len = %" %len(eigenNorm))
-        print("non-index = %" %len(non_index))
-
-        # Store the additional features in the CustomDataset instance
-        TEST_DATASET_WHOLE_SCENE.eigenNorm = eigenNorm
-        TEST_DATASET_WHOLE_SCENE.llambda = llambda
-        TEST_DATASET_WHOLE_SCENE.lp = lp
-        TEST_DATASET_WHOLE_SCENE.lo = lo
-        TEST_DATASET_WHOLE_SCENE.lc = lc
-        TEST_DATASET_WHOLE_SCENE.non_index = non_index
-
-        # Filter the points and labels using the non_index variable
-        if len(non_index) != 0:
-            filtered_indices = TEST_DATASET.filtered_indices()
-            TEST_DATASET_WHOLE_SCENE.filtered_update(filtered_indices)
-
-        print("geometric room_idx evaluation")
-        print(TEST_DATASET_WHOLE_SCENE.room_idxs)
-        print(len(TEST_DATASET_WHOLE_SCENE))
-      else:
+            print(len(TEST_DATASET_WHOLE_SCENE))
+    else:
         TEST_DATASET_WHOLE_SCENE = TestCustomDataset.load_data(saveDir+saveTest)
 
     timePrint(testdatatime)

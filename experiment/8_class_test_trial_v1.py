@@ -40,6 +40,7 @@ for i, cat in enumerate(seg_classes.keys()):
 
 print(seg_label_to_cat)
 
+# Adjust parameters here if there no changes to reduce line
 def parse_args():
     '''PARAMETERS'''
     parser = argparse.ArgumentParser('Model')
@@ -51,7 +52,7 @@ def parse_args():
     parser.add_argument('--visual', action='store_true', default=False, help='visualize result [default: False]')
     parser.add_argument('--test_area', type=str, default='DEBY_LOD2_4959323.las', help='area for testing, option: 1-6 [default: 5]')
     parser.add_argument('--num_votes', type=int, default=5, help='aggregate segmentation scores with voting [default: 5]')
-    parser.add_argument('--model', type=str, help='model name [default: pointnet_sem_seg]')
+    parser.add_argument('--model', type=str, default='pointnet_sem_seg_trial', help='model name [default: pointnet_sem_seg]')
     parser.add_argument('--output_model', type=str, default='/best_model.pth', help='model output name')
     parser.add_argument('--rootdir', type=str, default='/content/drive/MyDrive/ data/tum/tum-facade/training/selected/', help='directory to data')
     parser.add_argument('--load', type=bool, default=False, help='load saved data or new')

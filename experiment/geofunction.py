@@ -35,7 +35,7 @@ def PCA(data, correlation=False, sort=True):
     return eigenvalues, eigenvectors
 
 
-def collFeatures(pcd, length, size=0.8):
+def collFeatures(pcd, length, size=0.8, num_of_files):
     pcd_tree = o3d.geometry.KDTreeFlann(pcd)  # set a kd tree for tha point cloud, make searching faster
     normals = []
     llambda = []
@@ -66,7 +66,25 @@ def collFeatures(pcd, length, size=0.8):
         lp.append(p)
         lo.append(o)
         lc.append(c)
-    return np.array(normals), np.array(llambda), np.array(lp).reshape(length, -1), np.array(lo).reshape(length,-1), np.array(lc).reshape(length, -1), np.array(non_idx)
+
+    normals_array = np.array(normals) 
+    llambda_array = np.array(llambda)  # Convert the list of eigenvalues to a NumPy array
+    lp_array = np.array(lp).reshape(length, -1)  # Convert the list of lp features to a NumPy array
+    lo_array = np.array(lo).reshape(length, -1)  # Convert the list of lo features to a NumPy array
+    lc_array = np.array(lc).reshape(length, -1) 
+
+    lp_split = np.split(lp_array, num_of_files, axis=1)
+    lo_split = np.split(lo_array, num_of_files, axis=1)
+    lc_split = np.split(lc_array, num_of_files, axis=1)
+    llambda_split = np.split(llambda_array, num_of_files, axis=1)
+    normals_split = np.split(normals_array, num_of_files, axis=1)
+
+    print(lp_split)
+    print("shape of lp: " lp_split.shape)
+    for i, column in enumerate(lp_split, start=1):
+        print(f"Column {i}:\n", column)
+        
+    return normals_array.tolist(), llambda_array.tolist(), lp_split.tolist(), lo_array.tolist(), lc_array.tolist(), non_idx
 
 
 def downsamplingPCD(pcd, dataset):
