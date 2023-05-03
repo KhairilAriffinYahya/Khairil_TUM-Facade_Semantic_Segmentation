@@ -89,16 +89,6 @@ class TestCustomDataset():
             points = np.vstack((in_file.x, in_file.y, in_file.z)).T
             labels = np.array(in_file.classification, dtype=np.int32)
 
-            # Merge labels as per instructions
-            labels[(labels == 5) | (labels == 6)] = 6  # Merge molding and decoration
-            labels[(labels == 1) |(labels == 9) | (labels == 15) | (labels == 10)] = 1  # Merge wall, drainpipe, outer ceiling surface, and stairs
-            labels[(labels == 12) | (labels == 11)] = 11  # Merge terrain and ground surface
-            labels[(labels == 13) | (labels == 16) | (labels == 17)] = 13  # Merge interior, roof, and other
-            labels[labels == 14] = 2  # Add blinds to window
-
-            # Map merged labels to new labels (0 to 7)
-            labels = np.vectorize(new_class_mapping.get)(labels)
-
             data = np.hstack((points, labels.reshape((-1, 1))))
             self.scene_points_list.append(data[:, :3])
             self.semantic_labels_list.append(data[:, 3])
@@ -266,9 +256,9 @@ def main(args):
         tmp_dir = args.exp_dir
         print(tmp_dir)
     experiment_dir = tmp_dir + args.log_dir
-    print("Logging Directory = " +experiment_dir)
+    print("Logging Directory = " +str(experiment_dir))
     visual_dir = experiment_dir + '/visual/'
-    print("Visual Directory = " +experiment_dir)
+    print("Visual Directory = " +str(visual_dir))
     visual_dir = Path(visual_dir)
     visual_dir.mkdir(exist_ok=True)
 

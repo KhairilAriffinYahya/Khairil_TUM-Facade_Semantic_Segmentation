@@ -51,7 +51,7 @@ print(seg_label_to_cat)
 # Adjust parameters here if there no changes to reduce line
 def parse_args():
     parser = argparse.ArgumentParser('Model')
-    parser.add_argument('--model', type=str, default='pointnet_sem_seg_trial', help='model name [default: pointnet_sem_seg]')
+    parser.add_argument('--model', type=str, default='pointnet2_sem_seg_trial', help='model name [default: pointnet_sem_seg]')
     parser.add_argument('--batch_size', type=int, default=16, help='Batch Size during training [default: 16]')
     parser.add_argument('--epoch', default=32, type=int, help='Epoch to run [default: 32]')
     parser.add_argument('--learning_rate', default=0.001, type=float, help='Initial learning rate [default: 0.001]')
@@ -106,16 +106,6 @@ class TrainCustomDataset(Dataset):
             las_data = laspy.read(room_path)
             coords = np.vstack((las_data.x, las_data.y, las_data.z)).transpose()
             labels = np.array(las_data.classification, dtype=np.uint8)
-
-            # Merge labels as per instructions
-            labels[(labels == 5) | (labels == 6)] = 6  # Merge molding and decoration
-            labels[(labels == 1) |(labels == 9) | (labels == 15) | (labels == 10)] = 1  # Merge wall, drainpipe, outer ceiling surface, and stairs
-            labels[(labels == 12) | (labels == 11)] = 11  # Merge terrain and ground surface
-            labels[(labels == 13) | (labels == 16) | (labels == 17)] = 13  # Merge interior, roof, and other
-            labels[labels == 14] = 2  # Add blinds to window
-
-            # Map merged labels to new labels (0 to 7)
-            labels = np.vectorize(new_class_mapping.get)(labels)
 
             room_data = np.concatenate((coords, labels[:, np.newaxis]), axis=1)  # xyzl, N*4
             points, labels = room_data[:, 0:3], room_data[:, 3]  # xyz, N*3; l, N
@@ -254,13 +244,13 @@ def main(args):
         experiment_dir = experiment_dir.joinpath(timestr)
     else:
         experiment_dir = experiment_dir.joinpath(args.log_dir)
-    print("Logging Directory = " +experiment_dir)
+    print("Logging Directory = " +str(experiment_dir))
     experiment_dir.mkdir(exist_ok=True)
     checkpoints_dir = experiment_dir.joinpath('checkpoints/')
     checkpoints_dir.mkdir(exist_ok=True)
     log_dir = experiment_dir.joinpath('logs/')
     log_dir.mkdir(exist_ok=True)
-    print("Logs Directory = " +log_dir)
+    print("Logs Directory = " +str(log_dir))
 
     '''LOG'''
     args = parse_args()

@@ -304,9 +304,9 @@ def main(args):
         tmp_dir = args.exp_dir
         print(tmp_dir)
     experiment_dir = tmp_dir + args.log_dir
-    print("Logging Directory = " +experiment_dir)
+    print("Logging Directory = " +str(experiment_dir))
     visual_dir = experiment_dir + '/visual/'
-    print("Visual Directory = " +experiment_dir)
+    print("Visual Directory = " +str(visual_dir))
     visual_dir = Path(visual_dir)
     visual_dir.mkdir(exist_ok=True)
 

@@ -51,7 +51,7 @@ print(seg_label_to_cat)
 # Adjust parameters here if there no changes to reduce line
 def parse_args():
     parser = argparse.ArgumentParser('Model')
-    parser.add_argument('--model', type=str, default='pointnet_sem_seg_trial', help='model name [default: pointnet_sem_seg]')
+    parser.add_argument('--model', type=str, default='pointnet2_sem_seg_trial', help='model name [default: pointnet_sem_seg]')
     parser.add_argument('--batch_size', type=int, default=16, help='Batch Size during training [default: 16]')
     parser.add_argument('--epoch', default=32, type=int, help='Epoch to run [default: 32]')
     parser.add_argument('--learning_rate', default=0.001, type=float, help='Initial learning rate [default: 0.001]')
@@ -255,14 +255,14 @@ def main(args):
         experiment_dir = experiment_dir.joinpath(timestr)
     else:
         experiment_dir = experiment_dir.joinpath(args.log_dir)
-    print("Logging Directory = " +experiment_dir)
+    print("Logging Directory = " +str(experiment_dir))
     experiment_dir.mkdir(exist_ok=True)
     checkpoints_dir = experiment_dir.joinpath('checkpoints/')
     checkpoints_dir.mkdir(exist_ok=True)
     log_dir = experiment_dir.joinpath('logs/')
     log_dir.mkdir(exist_ok=True)
-    print("Logs Directory = " +log_dir)
-
+    print("Logs Directory = " +str(log_dir))
+    
     '''LOG'''
     args = parse_args()
     logger = logging.getLogger("Model")
