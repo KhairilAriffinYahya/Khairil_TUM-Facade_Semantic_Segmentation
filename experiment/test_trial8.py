@@ -156,6 +156,7 @@ class TestCustomDataset():
                 label_room = np.hstack([label_room, label_batch]) if label_room.size else label_batch
                 sample_weight = np.hstack([sample_weight, batch_weight]) if label_room.size else batch_weight
                 index_room = np.hstack([index_room, point_idxs]) if index_room.size else point_idxs
+                
         data_room = data_room.reshape((-1, self.block_points, data_room.shape[1]))
         label_room = label_room.reshape((-1, self.block_points))
         sample_weight = sample_weight.reshape((-1, self.block_points))
@@ -170,6 +171,7 @@ class TestCustomDataset():
         num_classes = len(self.labelweights)
         labelweights = np.zeros(num_classes)
         tmp_scene_points_num = []
+        
         for seg in self.semantic_labels_list:
             tmp, _ = np.histogram(seg, range(num_classes + 1))
             tmp_scene_points_num.append(seg.shape[0])

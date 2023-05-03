@@ -69,9 +69,11 @@ class TestCustomDataset():
         self.stride = stride
         self.num_classes = num_classes
 
+        #self.scene_points_num = []
         self.scene_points_list = []
         self.semantic_labels_list = []
         self.room_coord_min, self.room_coord_max = [], []
+        self.labelweights = np.zeros(num_classes)
 
         if las_file_list is None:
             return
@@ -102,6 +104,15 @@ class TestCustomDataset():
             coord_min, coord_max = np.amin(points, axis=0)[:3], np.amax(points, axis=0)[:3]
             self.room_coord_min.append(coord_min), self.room_coord_max.append(coord_max)
         assert len(self.scene_points_list) == len(self.semantic_labels_list)
+        
+        labelweights = np.zeros(num_classes)
+        for seg in self.semantic_labels_list:
+            tmp, _ = np.histogram(seg, range(range_class))
+            #self.scene_points_num.append(seg.shape[0])
+            labelweights += tmp
+        labelweights = labelweights.astype(np.float32)
+        labelweights = labelweights / np.sum(labelweights)
+        
 
     def __getitem__(self, index):
         point_set_ini = self.scene_points_list[index]
@@ -111,6 +122,7 @@ class TestCustomDataset():
         grid_x = int(np.ceil(float(coord_max[0] - coord_min[0] - self.block_size) / self.stride) + 1)
         grid_y = int(np.ceil(float(coord_max[1] - coord_min[1] - self.block_size) / self.stride) + 1)
         data_room, label_room, sample_weight, index_room = np.array([]), np.array([]), np.array([]),  np.array([])
+        
         for index_y in range(grid_y):
             for index_x in range(grid_x):
                 s_x = coord_min[0] + index_x * self.stride
@@ -144,6 +156,7 @@ class TestCustomDataset():
                 label_room = np.hstack([label_room, label_batch]) if label_room.size else label_batch
                 sample_weight = np.hstack([sample_weight, batch_weight]) if label_room.size else batch_weight
                 index_room = np.hstack([index_room, point_idxs]) if index_room.size else point_idxs
+                
         data_room = data_room.reshape((-1, self.block_points, data_room.shape[1]))
         label_room = label_room.reshape((-1, self.block_points))
         sample_weight = sample_weight.reshape((-1, self.block_points))
@@ -167,7 +180,8 @@ class TestCustomDataset():
         labelweights = labelweights.astype(np.float32)
         labelweights = labelweights / np.sum(labelweights)  # normalize weights to 1
         labelweights = np.power(np.amax(labelweights) / labelweights, 1 / 3.0)  # balance weights
-
+        #scene_points_num = tmp_scene_points_num
+        
         print(labelweights)
         assert len(labelweights) == num_classes
 
@@ -186,6 +200,13 @@ class TestCustomDataset():
 
         new_dataset.scene_points_list = [self.scene_points_list[i] for i in new_indices]
         new_dataset.semantic_labels_list = [self.semantic_labels_list[i] for i in new_indices]
+
+        if new_indices == None:
+            new_dataset.labelweights = self.labelweights
+        else:
+            lw, spn = new_dataset.labelweights()
+            new_dataset.labelweights = lw
+            #new_dataset.scene_points_num = spn
 
         return new_dataset
 
@@ -211,7 +232,7 @@ class TestCustomDataset():
         labelweights = labelweights.astype(np.float32)
         labelweights = labelweights / np.sum(labelweights)
         self.labelweights = np.power(np.amax(labelweights) / labelweights, 1 / 3.0)
-        self.scene_points_num = tmp_scene_points_num
+        #self.scene_points_num = tmp_scene_points_num
 
     def save_data(self, file_path):
         with open(file_path, 'wb') as f:
@@ -267,7 +288,7 @@ def main(args):
         TEST_DATASET_WHOLE_SCENE = TestCustomDataset.load_data(saveDir+saveTest)
 
     if args.save is True:
-        TEST_DATASET_WHOLE_SCENE.save(saveDir+saveTest)
+        TEST_DATASET_WHOLE_SCENE.save_data(saveDir+saveTest)
 
     log_string("The number of test data is: %d" % len(TEST_DATASET_WHOLE_SCENE))
 
