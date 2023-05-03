@@ -28,8 +28,8 @@ import pytz
 timezone = pytz.timezone('Asia/Singapore')
 print("Check current time")
 CurrentTime(timezone)
-saveTrain = "8cla_traindata.pkl"
-saveEval = "8cla_evaldata.pkl"
+saveTrain = "17cla_traindata.pkl"
+saveEval = "17cla_evaldata.pkl"
 saveDir = "/content/Khairil_PN2_experiment/experiment/data/saved_data/"
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 classes = ["total", "wall", "window",  "door",  "balcony","molding", "deco", "column", "arch", "drainpipe", "stairs",  "ground surface",
@@ -98,8 +98,6 @@ class TrainCustomDataset(Dataset):
         num_point_all = []
         labelweights = np.zeros(adjustedclass)
 
-        new_class_mapping = {1: 0, 2: 1, 3:2, 6: 3, 13: 4, 11: 5, 7: 6, 8: 7}
-
         for room_path in rooms:
             # Read LAS file
             print("Reading = " + room_path)
@@ -123,6 +121,7 @@ class TrainCustomDataset(Dataset):
         for index in range(len(rooms)):
             room_idxs.extend([index] * int(round(sample_prob[index] * num_iter)))
         self.room_idxs = np.array(room_idxs)
+        # print(labelweights)
 
         print("Totally {} samples in dataset.".format(len(self.room_idxs)))
 
@@ -185,6 +184,7 @@ class TrainCustomDataset(Dataset):
         copied_dataset.num_point = self.num_point
         copied_dataset.block_size = self.block_size
         copied_dataset.transform = self.transform
+        copied_dataset.num_classes = self.num_classes
         copied_dataset.room_points = self.room_points.copy()
         copied_dataset.room_labels = self.room_labels.copy()
         copied_dataset.room_coord_min = self.room_coord_min.copy()

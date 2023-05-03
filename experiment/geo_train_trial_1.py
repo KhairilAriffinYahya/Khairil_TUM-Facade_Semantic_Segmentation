@@ -257,6 +257,7 @@ class TrainCustomDataset(Dataset):
         copied_dataset.num_point = self.num_point
         copied_dataset.block_size = self.block_size
         copied_dataset.transform = self.transform
+        copied_dataset.num_classes = self.num_classes
         copied_dataset.room_points = self.room_points.copy()
         copied_dataset.room_labels = self.room_labels.copy()
         copied_dataset.room_coord_min = self.room_coord_min.copy()

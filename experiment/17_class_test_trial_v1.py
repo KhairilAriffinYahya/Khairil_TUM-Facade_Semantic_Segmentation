@@ -21,7 +21,7 @@ import pytz
 timezone = pytz.timezone('Asia/Singapore')
 print("Check current time")
 CurrentTime(timezone)
-saveTest = "8cla_testdata.pkl"
+saveTest = "17cla_testdata.pkl"
 saveDir = "/content/Khairil_PN2_experiment/experiment/data/saved_data/"
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 classes = ["total", "wall", "window",  "door",  "balcony","molding", "deco", "column", "arch", "drainpipe", "stairs",  "ground surface",
