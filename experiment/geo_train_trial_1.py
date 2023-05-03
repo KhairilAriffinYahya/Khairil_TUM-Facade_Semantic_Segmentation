@@ -319,6 +319,7 @@ def main(args):
     checkpoints_dir.mkdir(exist_ok=True)
     log_dir = experiment_dir.joinpath('logs/')
     log_dir.mkdir(exist_ok=True)
+    print("Logs Directory = " +log_dir)
 
     '''LOG'''
     args = parse_args()
