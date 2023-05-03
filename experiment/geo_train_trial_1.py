@@ -59,8 +59,8 @@ def parse_args():
     parser.add_argument('--learning_rate', default=0.001, type=float, help='Initial learning rate [default: 0.001]')
     parser.add_argument('--gpu', type=str, default='0', help='GPU to use [default: GPU 0]')
     parser.add_argument('--optimizer', type=str, default='Adam', help='Adam or SGD [default: Adam]')
-    parser.add_argument('--log_dir', type=str, default=None, help='Log path [default: None]')
-    parser.add_argument('--exp_dir', type=str, default=None, help='Log path [default: None]')
+    parser.add_argument('--log_dir', type=str, default='pointnet2_sem_seg', help='Log path [default: None]')
+    parser.add_argument('--exp_dir', type=str, default='./log/', help='Log path [default: None]')
     parser.add_argument('--decay_rate', type=float, default=1e-4, help='weight decay [default: 1e-4]')
     parser.add_argument('--npoint', type=int, default=4096, help='Point Number [default: 4096]')
     parser.add_argument('--step_size', type=int, default=10, help='Decay step for lr decay [default: every 10 epochs]')
@@ -302,18 +302,12 @@ def main(args):
 
     '''CREATE DIR'''
     timestr = str(datetime.datetime.now().strftime('%Y-%m-%d_%H-%M'))
-    if args.exp_dir is None:
-        experiment_dir = Path('./log/')
-    else:
-        experiment_dir = Path(args.exp_dir)
-        print(experiment_dir)
+    experiment_dir = Path(args.exp_dir)
+    print(experiment_dir)
     experiment_dir.mkdir(exist_ok=True)
     experiment_dir = experiment_dir.joinpath('sem_seg')
     experiment_dir.mkdir(exist_ok=True)
-    if args.log_dir is None:
-        experiment_dir = experiment_dir.joinpath(timestr)
-    else:
-        experiment_dir = experiment_dir.joinpath(args.log_dir)
+    experiment_dir = experiment_dir.joinpath(args.log_dir)
     experiment_dir.mkdir(exist_ok=True)
     checkpoints_dir = experiment_dir.joinpath('checkpoints/')
     checkpoints_dir.mkdir(exist_ok=True)
