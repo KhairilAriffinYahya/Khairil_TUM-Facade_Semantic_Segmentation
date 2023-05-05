@@ -22,7 +22,7 @@ import pickle
 import h5py
 from models.localfunctions import timePrint, CurrentTime, inplace_relu, modelTraining
 import pytz
-from geofunction import PCA, collFeatures, downsamplingPCD, createPCD
+from geofunction import cal_geofeature
 
 '''Adjust permanent/file/static variables here'''
 
@@ -301,6 +301,10 @@ class TrainCustomDataset(Dataset):
     def load_data(file_path):
         with open(file_path, 'rb') as f:
             dataset = pickle.load(f)
+
+        print("Extra features to be included = %d" % dataset.num_extra_features)
+        print("Number of Classes in dataset = %d" %dataset.num_classes)
+        print("Totally {} samples in dataset.".format(len(dataset.room_idxs)))
         return dataset
 
 
@@ -376,44 +380,8 @@ def main(args):
 
         if args.calculate_geometry is True:
             print("room_idx training")
-            print(TRAIN_DATASET.room_idxs)
             print(len(TRAIN_DATASET.room_idxs))
-
-            # Open3D
-            pcd_train, train_points, train_labels = createPCD(TRAIN_DATASET)
-
-            # Downsampling
-            if args.downsample is True:
-                pcd_train, train_points, train_labels, TRAIN_DATASET = downsamplingPCD(pcd_train, TRAIN_DATASET)
-                print("downsampled room_idx training")
-                print(TRAIN_DATASET.room_idxs)
-
-            # Visualization
-            if args.visualizeModel is True:
-                colors = plt.get_cmap("tab20")(np.array(train_labels).reshape(-1) / 17.0)
-                colors = colors[:, 0:3]
-                pcd_train.colors = o3d.utility.Vector3dVector(colors)
-                o3d.visualization.draw_geometries([pcd_train], window_name='test the color', width=800, height=600)
-
-            # Geometric Feature Addition
-            # add features, normals, lambda, p, o, c, radius is 0.8m
-            train_total_len = len(TRAIN_DATASET)
-            t_eigenNorm, t_llambda, t_lp, t_lo, t_lc, t_non_index = collFeatures(pcd_train, train_total_len)
-
-            print("eigenvector len = %" % len(t_eigenNorm))
-            print("non-index = %" % len(t_non_index))
-
-            # Store the additional features in the CustomDataset instance
-            TRAIN_DATASET.lp_data = t_lp
-            TRAIN_DATASET.lo_data = t_lo
-            TRAIN_DATASET.lc_data = t_lc
-            TRAIN_DATASET.non_index = t_non_index
-
-            # Filter the points and labels using the non_index variable
-            if len(t_non_index) != 0:
-                filtered_indices = TRAIN_DATASET.filtered_indices()
-                TRAIN_DATASET.index_update(filtered_indices)
-
+            cal_geofeature(TRAIN_DATASET, args.downsample, args.visualizeModel)
             print("geometric room_idx training")
             print(TRAIN_DATASET.room_idxs)
             print(len(TRAIN_DATASET.room_idxs))
@@ -426,47 +394,10 @@ def main(args):
         EVAL_DATASET = lidar_dataset.copy(indices=eval_indices)
 
         if args.calculate_geometry is True:
-            print("room_idx training")
-            print(TRAIN_DATASET.room_idxs)
-            print(len(TRAIN_DATASET.room_idxs))
-
-            # Open3D
-            pcd_eval, eval_points, eval_labels = createPCD(EVAL_DATASET)
-
-            # Downsampling
-            if args.downsample is True:
-                pcd_eval, eval_points, eval_labels, TRAIN_DATASET = downsamplingPCD(pcd_eval, TRAIN_DATASET)
-                print("downsampled room_idx evaluation")
-                print(EVAL_DATASET.room_idxs)
-
-            # Visualization
-            if args.visualizeModel is True:
-                colors = plt.get_cmap("tab20")(np.array(eval_labels).reshape(-1) / 17.0)
-                colors = colors[:, 0:3]
-                pcd_eval.colors = o3d.utility.Vector3dVector(colors)
-                o3d.visualization.draw_geometries([pcd_eval], window_name='test the color', width=800, height=600)
-
-            # Geometric Feature Addition
-            # add features, normals, lambda, p, o, c, radius is 0.8m
-            eval_total_len = len(EVAL_DATASET)
-            e_eigenNorm, e_llambda, e_lp, e_lo, e_lc, e_non_index = collFeatures(pcd_eval, eval_total_len)
-
-            print("eigenvector len = %" % len(e_eigenNorm))
-            print("non-index = %" % len(e_non_index))
-
-            # Store the additional features in the CustomDataset instance
-            EVAL_DATASET.lp_data = e_lp
-            EVAL_DATASET.lo_data = e_lo
-            EVAL_DATASET.lc_data = e_lc
-            EVAL_DATASET.non_index = e_non_index
-
-            # Filter the points and labels using the non_index variable
-            if len(e_non_index) != 0:
-                filtered_indices = EVAL_DATASET.filtered_indices()
-                EVAL_DATASET.index_update(filtered_indices)
-
+            print("room_idx evaluation")
+            print(len(EVAL_DATASET.room_idxs))
+            cal_geofeature(EVAL_DATASET, args.downsample, args.visualizeModel)
             print("geometric room_idx evaluation")
-            print(EVAL_DATASET.room_idxs)
             print(len(EVAL_DATASET))
 
         timePrint(start)

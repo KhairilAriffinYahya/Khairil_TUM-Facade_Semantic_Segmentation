@@ -247,6 +247,8 @@ class TestCustomDataset():
     def load_data(file_path):
         with open(file_path, 'rb') as f:
             dataset = pickle.load(f)
+        print("Number of Classes in dataset = %d" %dataset.num_classes)
+        print("Totally {} samples in dataset.".format(len(dataset.room_idxs)))
         return dataset
 
 def main(args):

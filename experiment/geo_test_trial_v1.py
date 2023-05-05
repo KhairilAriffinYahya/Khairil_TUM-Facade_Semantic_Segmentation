@@ -14,7 +14,7 @@ import pickle
 import h5py
 from models.localfunctions import timePrint, CurrentTime
 import pytz
-from geofunction import PCA, collFeatures, downsamplingPCD, createPCD
+from geofunction import cal_geofeature
 import matplotlib.pyplot as plt
 import time
 
@@ -83,7 +83,6 @@ def add_vote(vote_label_pool, point_idx, pred_label, weight):
             if weight[b, n] != 0 and not np.isinf(weight[b, n]):
                 vote_label_pool[int(point_idx[b, n]), int(pred_label[b, n])] += 1
     return vote_label_pool
-
 
 class TestCustomDataset():
     # prepare to give prediction on each points
@@ -238,13 +237,13 @@ class TestCustomDataset():
         return len(self.scene_points_list)
 
     def filtered_indices(self):
-        total_indices = set(range(len(self.room_points)))
+        total_indices = set(range(len(self.scene_points_list)))
         non_index_set = set(self.non_index)
         filtered_indices = list(total_indices - non_index_set)
         return filtered_indices
 
     def index_update(self, newIndices):
-        self.room_idxs = newIndices
+        self.semantic_labels_list = newIndices
 
     def copy(self, new_indices=None):
         new_dataset = TestCustomDataset()
@@ -301,6 +300,10 @@ class TestCustomDataset():
     def load_data(file_path):
         with open(file_path, 'rb') as f:
             dataset = pickle.load(f)
+
+        print("Extra features to be included = %d" % dataset.num_extra_features)
+        print("Number of Classes in dataset = %d" %dataset.num_classes)
+        print("Totally {} samples in dataset.".format(len(dataset.room_idxs)))
         return dataset
 
 
@@ -351,46 +354,10 @@ def main(args):
         log_string("The number of test data is: %d" % len(TEST_DATASET_WHOLE_SCENE))
 
         if args.calculate_geometry is True:
-            print("room_idx evaluation")
+            print("room_idx test")
             print(len(TEST_DATASET_WHOLE_SCENE))
-
-            # Open3D
-            pcd_test, test_points, test_labels = createPCD(TEST_DATASET_WHOLE_SCENE)
-
-            # Downsampling
-            if args.downsample is True:
-                pcd_test, test_points, test_labels, TRAIN_DATASET = downsamplingPCD(pcd_test, TRAIN_DATASET)
-                print("downsampled room_idx evaluation")
-                print(TEST_DATASET_WHOLE_SCENE.room_idxs)
-
-            # Visualization
-            if args.visualizeModel is True:
-                colors = plt.get_cmap("tab20")(np.array(test_labels).reshape(-1) / 17.0)
-                colors = colors[:, 0:3]
-                pcd_test.colors = o3d.utility.Vector3dVector(colors)
-                o3d.visualization.draw_geometries([pcd_test], window_name='test the color', width=800, height=600)
-
-            # Geometric Feature Addition
-            # add features, normals, lambda, p, o, c, radius is 0.8m
-            test_total_len = len(TEST_DATASET_WHOLE_SCENE)
-            eigenNorm, llambda, lp, lo, lc, non_index = collFeatures(pcd_test, test_total_len)
-
-            print("eigenvector len = %" % len(eigenNorm))
-            print("non-index = %" % len(non_index))
-
-            # Store the additional features in the CustomDataset instance
-            TEST_DATASET_WHOLE_SCENE.lp = lp
-            TEST_DATASET_WHOLE_SCENE.lo = lo
-            TEST_DATASET_WHOLE_SCENE.lc = lc
-            TEST_DATASET_WHOLE_SCENE.non_index = non_index
-
-            # Filter the points and labels using the non_index variable
-            if len(non_index) != 0:
-                filtered_indices = TEST_DATASET.filtered_indices()
-                TEST_DATASET_WHOLE_SCENE.filtered_update(filtered_indices)
-
-            print("geometric room_idx evaluation")
-            print(TEST_DATASET_WHOLE_SCENE.room_idxs)
+            cal_geofeature(TEST_DATASET_WHOLE_SCENE, args.downsample, args.visualizeModel)
+            print("geometric room_idx test")
             print(len(TEST_DATASET_WHOLE_SCENE))
     else:
         TEST_DATASET_WHOLE_SCENE = TestCustomDataset.load_data(saveDir + saveTest)
