@@ -35,7 +35,7 @@ def PCA(data, correlation=False, sort=True):
     return eigenvalues, eigenvectors
 
 
-def collFeatures(pcd, length, size=0.8, num_of_files):
+def collFeatures(pcd, length, size=0.8, num_of_files=1):
     pcd_tree = o3d.geometry.KDTreeFlann(pcd)  # set a kd tree for tha point cloud, make searching faster
     normals = []
     llambda = []
@@ -80,7 +80,7 @@ def collFeatures(pcd, length, size=0.8, num_of_files):
     normals_split = np.split(normals_array, num_of_files, axis=1)
 
     print(lp_split)
-    print("shape of lp: " lp_split.shape)
+    print("shape of lp: ", lp_split.shape)
     for i, column in enumerate(lp_split, start=1):
         print(f"Column {i}:\n", column)
         
