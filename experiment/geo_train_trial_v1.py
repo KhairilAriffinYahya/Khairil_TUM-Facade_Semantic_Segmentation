@@ -127,15 +127,15 @@ class TrainCustomDataset(Dataset):
                 self.num_extra_features = 0
                 if 'p' in args.geometry_features:
                     self.num_extra_features += 1
-                    tmp_p = np.array(las_data.planarity, dtype=np.uint8)
+                    tmp_p = np.array(las_data.planarity, dtype=np.float64)
                     self.lp_data.append(tmp_p)
                 if 'o' in args.geometry_features:
                     self.num_extra_features += 1
-                    tmp_o = np.array(las_data.Omnivariance, dtype=np.uint8)
+                    tmp_o = np.array(las_data.Omnivariance, dtype=np.float64)
                     self.lo_data.append(tmp_o)
                 if 'c' in args.geometry_features:
                     self.num_extra_features += 1
-                    tmp_c = np.array(las_data.surface_variation, dtype=np.uint8)
+                    tmp_c = np.array(las_data.surface_variation, dtype=np.float64)
                     self.lc_data.append(tmp_c)
 
             # Merge labels as per instructions

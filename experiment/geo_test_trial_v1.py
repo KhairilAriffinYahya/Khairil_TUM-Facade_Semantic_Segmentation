@@ -119,24 +119,24 @@ class TestCustomDataset():
 
         for files in self.file_list:
             file_path = os.path.join(root, files)
+            # Read LAS file
+            print("Reading = " + file_path)
             in_file = laspy.read(file_path)
             points = np.vstack((in_file.x, in_file.y, in_file.z)).T
             labels = np.array(in_file.classification, dtype=np.int32)
-            print("Labels")
-            print(labels)
             if args.calculate_geometry is False:
                 self.num_extra_features = 0
                 if 'p' in args.geometry_features:
                     self.num_extra_features += 1
-                    tmp_p = np.array(in_file.planarity, dtype=np.uint8)
+                    tmp_p = np.array(in_file.planarity, dtype=np.float64)
                     self.lp_data.append(tmp_p)
                 if 'o' in args.geometry_features:
                     self.num_extra_features += 1
-                    tmp_o = np.array(in_file.Omnivariance, dtype=np.uint8)
+                    tmp_o = np.array(in_file.Omnivariance, dtype=np.float64)
                     self.lo_data.append(tmp_o)
                 if 'c' in args.geometry_features:
                     self.num_extra_features += 1
-                    tmp_c = np.array(in_file.surface_variation, dtype=np.uint8)
+                    tmp_c = np.array(in_file.surface_variation, dtype=np.float64)
                     self.lc_data.append(tmp_c)
 
             # Merge labels as per instructions
@@ -168,7 +168,6 @@ class TestCustomDataset():
 
     def __getitem__(self, index):
         point_set_ini = self.scene_points_list[index]
-        print("Index = %d" % index)
         points = point_set_ini[:, :3]
         labels = self.semantic_labels_list[index]
         coord_min, coord_max = np.amin(points, axis=0)[:3], np.amax(points, axis=0)[:3]
@@ -245,7 +244,7 @@ class TestCustomDataset():
         return filtered_indices
 
     def index_update(self, newIndices):
-        self.room_idxs = new_room_idxs
+        self.room_idxs = newIndices
 
     def copy(self, new_indices=None):
         new_dataset = TestCustomDataset()

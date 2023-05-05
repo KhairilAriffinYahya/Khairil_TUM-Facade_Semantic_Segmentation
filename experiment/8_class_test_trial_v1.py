@@ -85,6 +85,8 @@ class TestCustomDataset():
 
         for files in self.file_list:
             file_path = os.path.join(root, files)
+            # Read LAS file
+            print("Reading = " + file_path)
             in_file = laspy.read(file_path)
             points = np.vstack((in_file.x, in_file.y, in_file.z)).T
             labels = np.array(in_file.classification, dtype=np.int32)
