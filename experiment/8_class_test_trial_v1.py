@@ -70,7 +70,7 @@ class TestCustomDataset():
         self.stride = stride
         self.num_classes = num_classes
 
-        #self.scene_points_num = []
+        self.scene_points_num = []
         self.scene_points_list = []
         self.semantic_labels_list = []
         self.room_coord_min, self.room_coord_max = [], []
@@ -109,10 +109,12 @@ class TestCustomDataset():
         labelweights = np.zeros(num_classes)
         for seg in self.semantic_labels_list:
             tmp, _ = np.histogram(seg, range(range_class))
-            #self.scene_points_num.append(seg.shape[0])
+            self.scene_points_num.append(seg.shape[0])
             labelweights += tmp
         labelweights = labelweights.astype(np.float32)
         labelweights = labelweights / np.sum(labelweights)
+        self.labelweights = np.power(np.amax(labelweights) / labelweights, 1 / 3.0)
+
         
 
     def __getitem__(self, index):

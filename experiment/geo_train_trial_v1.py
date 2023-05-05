@@ -215,10 +215,6 @@ class TrainCustomDataset(Dataset):
             selected_lp = lp_room[selected_point_idxs]  # num_point * lp_features
             geo_features.append(selected_lp)
             num_of_features += 1
-            tmp_points = np.zeros((self.num_point, num_of_features))
-            tmp_points[:, 0:num_of_features - 1] = current_features
-            tmp_points[:, num_of_features] = selected_lp
-            current_features = tmp_points
         if 'o' in args.geometry_features:
             lo_room = self.lo_data[room_idx]
             selected_lo = lo_room[selected_point_idxs]  # num_point * lo_features
@@ -229,10 +225,7 @@ class TrainCustomDataset(Dataset):
             selected_lc = lc_room[selected_point_idxs]  # num_point * lc_features
             geo_features.append(selected_lc)
             num_of_features += 1
-            tmp_points = np.zeros((self.num_point, num_of_features))
-            tmp_points[:, 0:num_of_features - 1] = current_features
-            tmp_points[:, num_of_features] = selected_lc
-            current_features = tmp_points
+
 
         tmp_features = np.zeros((self.num_point, num_of_features))
         tmp_features[:, 0:current_points.shape[1]] = current_features

@@ -16,6 +16,7 @@ from models.localfunctions import timePrint, CurrentTime
 import pytz
 from geofunction import PCA, collFeatures, downsamplingPCD, createPCD
 import matplotlib.pyplot as plt
+import time
 
 '''Adjust permanent/file/static variables here'''
 
@@ -26,7 +27,7 @@ saveTest = "geo_testdata.pkl"
 saveDir = "/content/Khairil_PN2_experiment/experiment/data/saved_data/"
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 # 0: wall, # 1: window, # 2: door, # 3: molding, # 4: other, # 5: terrain, # 6: column, # 7: arch
-classes = ["wall", "window",  "door",  "molding", "other", "terrain", "column", "arch"]
+classes = ["wall", "window", "door", "molding", "other", "terrain", "column", "arch"]
 NUM_CLASSES = 8
 train_ratio = 0.7
 
@@ -41,6 +42,7 @@ for i, cat in enumerate(seg_classes.keys()):
 
 print(seg_label_to_cat)
 
+
 # Adjust parameters here if there no changes to reduce line
 
 def parse_args():
@@ -52,18 +54,23 @@ def parse_args():
     parser.add_argument('--log_dir', type=str, default='pointnet2_sem_seg', help='log directory')
     parser.add_argument('--exp_dir', type=str, default='log/sem_seg/', help='Log path [default: None]')
     parser.add_argument('--visual', action='store_true', default=False, help='visualize result [default: False]')
-    parser.add_argument('--test_area', type=str, default='cc_o_DEBY_LOD2_4959323.las', help='area for testing, option: 1-6 [default: 5]')
-    parser.add_argument('--num_votes', type=int, default=5, help='aggregate segmentation scores with voting [default: 5]')
-    parser.add_argument('--model', type=str, default='pointnet2_sem_seg_geo_trial', help='model name [default: pointnet_sem_seg]')
+    parser.add_argument('--test_area', type=str, default='cc_o_DEBY_LOD2_4959323.las',
+                        help='area for testing, option: 1-6 [default: 5]')
+    parser.add_argument('--num_votes', type=int, default=5,
+                        help='aggregate segmentation scores with voting [default: 5]')
+    parser.add_argument('--model', type=str, default='pointnet2_sem_seg_geo_trial',
+                        help='model name [default: pointnet_sem_seg]')
     parser.add_argument('--output_model', type=str, default='/best_model.pth', help='model output name')
-    parser.add_argument('--rootdir', type=str, default='/content/drive/MyDrive/ data/tum/tum-facade/training/cc_selected/', help='directory to data')
+    parser.add_argument('--rootdir', type=str,
+                        default='/content/drive/MyDrive/ data/tum/tum-facade/training/cc_selected/',
+                        help='directory to data')
     parser.add_argument('--load', type=bool, default=False, help='load saved data or new')
     parser.add_argument('--save', type=bool, default=False, help='save data')
     parser.add_argument('--visualizeModel', type=str, default=False, help='directory to data')
     parser.add_argument('--downsample', type=bool, default=False, help='downsample data')
     parser.add_argument('--calculate_geometry', type=bool, default=False, help='decide where to calculate geometry')
-    parser.add_argument('--geometry_features', type=array, default=['p','o','c'], help='select which geometry_features to add')
-
+    parser.add_argument('--geometry_features', type=list, default=['p', 'o', 'c'],
+                        help='select which geometry_features to add')
 
     return parser.parse_args()
 
@@ -88,25 +95,25 @@ class TestCustomDataset():
         self.file_list = las_file_list
         self.stride = stride
         self.scene_points_num = []
+        self.scene_points_list = []
+        self.semantic_labels_list = []
+        self.room_coord_min, self.room_coord_max = [], []
+        self.labelweights = np.zeros(num_classes)
+        self.num_extra_features = 0
 
-        #For Geometric Features
-        self.lp = []
-        self.lo = []
-        self.lc = []
+        # For Geometric Features
+        self.lp_data = []
+        self.lo_data = []
+        self.lc_data = []
         self.non_index = []
-
 
         # Return early if las_file_list is None
         if las_file_list is None:
             self.room_idxs = np.array([])
             return
-            
+
         adjustedclass = num_classes
         range_class = adjustedclass + 1
-
-        self.scene_points_list = []
-        self.semantic_labels_list = []
-        self.room_coord_min, self.room_coord_max = [], []
 
         new_class_mapping = {1: 0, 2: 1, 3: 2, 6: 3, 13: 4, 11: 5, 7: 6, 8: 7}
 
@@ -117,21 +124,25 @@ class TestCustomDataset():
             labels = np.array(in_file.classification, dtype=np.int32)
             print("Labels")
             print(labels)
-            if calculate_geometry is False:
+            if args.calculate_geometry is False:
+                self.num_extra_features = 0
                 if 'p' in args.geometry_features:
-                    tmp_p = np.array(las_data.planarity, dtype=np.uint8)
-                    self.lp.append(tmp_p)
+                    self.num_extra_features += 1
+                    tmp_p = np.array(in_file.planarity, dtype=np.uint8)
+                    self.lp_data.append(tmp_p)
                 if 'o' in args.geometry_features:
-                    tmp_p = np.array(las_data.omnivariance, dtype=np.uint8)
-                    self.lo.append(tmp_o)
+                    self.num_extra_features += 1
+                    tmp_o = np.array(in_file.Omnivariance, dtype=np.uint8)
+                    self.lo_data.append(tmp_o)
                 if 'c' in args.geometry_features:
-                    tmp_p = np.array(las_data.surface_variation, dtype=np.uint8)
-                    self.lc.append(tmp_c)
-                    
+                    self.num_extra_features += 1
+                    tmp_c = np.array(in_file.surface_variation, dtype=np.uint8)
+                    self.lc_data.append(tmp_c)
+
             # Merge labels as per instructions
             labels[(labels == 5) | (labels == 6)] = 6  # Merge molding and decoration
             labels[(labels == 1) | (labels == 9) | (labels == 15) | (
-                        labels == 10)] = 1  # Merge wall, drainpipe, outer ceiling surface, and stairs
+                    labels == 10)] = 1  # Merge wall, drainpipe, outer ceiling surface, and stairs
             labels[(labels == 12) | (labels == 11)] = 11  # Merge terrain and ground surface
             labels[(labels == 13) | (labels == 16) | (labels == 17)] = 13  # Merge interior, roof, and other
             labels[labels == 14] = 2  # Add blinds to window
@@ -146,13 +157,20 @@ class TestCustomDataset():
             self.room_coord_min.append(coord_min), self.room_coord_max.append(coord_max)
         assert len(self.scene_points_list) == len(self.semantic_labels_list)
 
+        labelweights = np.zeros(num_classes)
+        for seg in self.semantic_labels_list:
+            tmp, _ = np.histogram(seg, range(range_class))
+            self.scene_points_num.append(seg.shape[0])
+            labelweights += tmp
+        labelweights = labelweights.astype(np.float32)
+        labelweights = labelweights / np.sum(labelweights)
+        self.labelweights = np.power(np.amax(labelweights) / labelweights, 1 / 3.0)
+
     def __getitem__(self, index):
         point_set_ini = self.scene_points_list[index]
+        print("Index = %d" % index)
         points = point_set_ini[:, :3]
         labels = self.semantic_labels_list[index]
-        lp = self.lp  # Load the lp features
-        lo = self.lo  # Load the lo features
-        lc = self.lc  # Load the lc features
         coord_min, coord_max = np.amin(points, axis=0)[:3], np.amax(points, axis=0)[:3]
         grid_x = int(np.ceil(float(coord_max[0] - coord_min[0] - self.block_size) / self.stride) + 1)
         grid_y = int(np.ceil(float(coord_max[1] - coord_min[1] - self.block_size) / self.stride) + 1)
@@ -184,20 +202,23 @@ class TestCustomDataset():
                 normlized_xyz[:, 2] = data_batch[:, 2] / coord_max[2]
                 data_batch[:, 0] = data_batch[:, 0] - (s_x + self.block_size / 2.0)
                 data_batch[:, 1] = data_batch[:, 1] - (s_y + self.block_size / 2.0)
-                tmp_geo_feature = []
-                if 'p' in args.geometry_features:
-                    tmp_geo_feature.append(lp[point_idxs, :])
-                if 'o' in args.geometry_features:
-                    tmp_geo_feature.append(lo[point_idxs, :])
-                if 'c' in args.geometry_features:
-                    tmp_geo_feature.append(lc[point_idxs, :])
-                
-                data_batch = np.concatenate((data_batch, lo[point_idxs, :]),axis=1)
-                print(data_batch)
-                if len(tmp_geo_feature) > 0:
-                    geo_feature = np.concatenate(tmp_geo_feature, axis=1)
-                    data_batch = np.concatenate((data_batch, geo_feature), axis=1)
-                    print(data_batch)
+                data_batch = np.concatenate((data_batch, normlized_xyz), axis=1)
+
+                geo_features = []
+                if 'p' in args.geometry_features:  # Load the lp features
+                    lp_room = self.lp_data[index]
+                    selected_lp = lp_room[point_idxs]  # num_point * lp_features
+                    geo_features.append(selected_lp)
+                if 'o' in args.geometry_features:  # Load the lo features
+                    lo_room = self.lo_data[index]
+                    selected_lo = lo_room[point_idxs]  # num_point * lo_features
+                    geo_features.append(selected_lo)
+                if 'c' in args.geometry_features:  # Load the lc features
+                    lc_room = self.lc_data[index]
+                    selected_lc = lc_room[point_idxs]  # num_point * lc_features
+                    geo_features.append(selected_lc)
+                tmp_features = np.array(geo_features).reshape(-1, 1)
+                data_batch = np.concatenate((data_batch, tmp_features), axis=1)
 
                 label_batch = labels[point_idxs].astype(int)
                 batch_weight = self.labelweights[label_batch]
@@ -216,7 +237,6 @@ class TestCustomDataset():
 
     def __len__(self):
         return len(self.scene_points_list)
-
 
     def filtered_indices(self):
         total_indices = set(range(len(self.room_points)))
@@ -237,19 +257,22 @@ class TestCustomDataset():
         new_dataset.num_classes = self.num_classes
         new_dataset.room_coord_min = self.room_coord_min
         new_dataset.room_coord_max = self.room_coord_max
-        new_dataset.lp = self.lp
-        new_dataset.lo = self.lo
-        new_dataset.lc = self.lc
+        new_dataset.lp_data = self.lp_data
+        new_dataset.lo_data = self.lo_data
+        new_dataset.lc_data = self.lc_data
         new_dataset.non_index = self.non_index
-        
+        new_dataset.num_extra_features = self.num_extra_features
+
         new_dataset.scene_points_list = [self.scene_points_list[i] for i in new_indices]
         new_dataset.semantic_labels_list = [self.semantic_labels_list[i] for i in new_indices]
+
+        labelweights, tmp_scene_points_num = new_dataset.calculate_labelweights()
+        new_dataset.labelweights = labelweights
+        new_dataset.scene_points_num = tmp_scene_points_num
 
         assert len(new_dataset.scene_points_list) == len(new_dataset.semantic_labels_list)
 
         return new_dataset
-
-
 
     def calculate_labelweights(self):
         print("Calculate Weights")
@@ -282,20 +305,18 @@ class TestCustomDataset():
         return dataset
 
 
-
 def main(args):
     def log_string(str):
         logger.info(str)
         print(str)
 
-
     '''Initialize'''
     root = args.rootdir
     BATCH_SIZE = args.batch_size
     NUM_POINT = args.num_point
-    savetest_path = saveDir+saveTest
-    test_file = glob.glob(root + args.test_area )
-    
+    savetest_path = saveDir + saveTest
+    test_file = glob.glob(root + args.test_area)
+
     '''HYPER PARAMETER'''
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
     if args.exp_dir is None:
@@ -304,9 +325,9 @@ def main(args):
         tmp_dir = args.exp_dir
         print(tmp_dir)
     experiment_dir = tmp_dir + args.log_dir
-    print("Logging Directory = " +str(experiment_dir))
+    print("Logging Directory = " + str(experiment_dir))
     visual_dir = experiment_dir + '/visual/'
-    print("Visual Directory = " +str(visual_dir))
+    print("Visual Directory = " + str(visual_dir))
     visual_dir = Path(visual_dir)
     visual_dir.mkdir(exist_ok=True)
 
@@ -322,7 +343,6 @@ def main(args):
     log_string('PARAMETER ...')
     log_string(args)
 
-    
     '''Dataset'''
     testdatatime = time.time()
 
@@ -331,15 +351,14 @@ def main(args):
         TEST_DATASET_WHOLE_SCENE = TestCustomDataset(root, test_file, num_classes=NUM_CLASSES, block_points=NUM_POINT)
         log_string("The number of test data is: %d" % len(TEST_DATASET_WHOLE_SCENE))
 
-        print("room_idx evaluation")
-        print(TEST_DATASET_WHOLE_SCENE.room_idxs)
-        print(len(TEST_DATASET_WHOLE_SCENE))
+        if args.calculate_geometry is True:
+            print("room_idx evaluation")
+            print(len(TEST_DATASET_WHOLE_SCENE))
 
-        if calculate_geometry is True:
-            #Open3D
+            # Open3D
             pcd_test, test_points, test_labels = createPCD(TEST_DATASET_WHOLE_SCENE)
 
-            #Downsampling
+            # Downsampling
             if args.downsample is True:
                 pcd_test, test_points, test_labels, TRAIN_DATASET = downsamplingPCD(pcd_test, TRAIN_DATASET)
                 print("downsampled room_idx evaluation")
@@ -352,13 +371,13 @@ def main(args):
                 pcd_test.colors = o3d.utility.Vector3dVector(colors)
                 o3d.visualization.draw_geometries([pcd_test], window_name='test the color', width=800, height=600)
 
-            #Geometric Feature Addition
+            # Geometric Feature Addition
             # add features, normals, lambda, p, o, c, radius is 0.8m
             test_total_len = len(TEST_DATASET_WHOLE_SCENE)
             eigenNorm, llambda, lp, lo, lc, non_index = collFeatures(pcd_test, test_total_len)
 
-            print("eigenvector len = %" %len(eigenNorm))
-            print("non-index = %" %len(non_index))
+            print("eigenvector len = %" % len(eigenNorm))
+            print("non-index = %" % len(non_index))
 
             # Store the additional features in the CustomDataset instance
             TEST_DATASET_WHOLE_SCENE.lp = lp
@@ -375,7 +394,7 @@ def main(args):
             print(TEST_DATASET_WHOLE_SCENE.room_idxs)
             print(len(TEST_DATASET_WHOLE_SCENE))
     else:
-        TEST_DATASET_WHOLE_SCENE = TestCustomDataset.load_data(saveDir+saveTest)
+        TEST_DATASET_WHOLE_SCENE = TestCustomDataset.load_data(saveDir + saveTest)
 
     timePrint(testdatatime)
     CurrentTime(timezone)
@@ -383,10 +402,10 @@ def main(args):
     if args.save is True:
         print("Save Test dataset")
         savetesttime = time.time()
-        TEST_DATASET_WHOLE_SCENE.save(saveDir+saveTest)
+        TEST_DATASET_WHOLE_SCENE.save_data(saveDir + saveTest)
         timePrint(savetesttime)
         CurrentTime(timezone)
-        
+
     '''MODEL LOADING'''
     model_name = args.output_model
     tmp_model = args.model
@@ -396,8 +415,9 @@ def main(args):
         model_dir = tmp_model
     print(model_dir)
     MODEL = importlib.import_module(model_dir)
-    classifier = MODEL.get_model(NUM_CLASSES).cuda()
-    checkpoint = torch.load(str(experiment_dir) + '/checkpoints'+model_name)
+    num_extra_features = TEST_DATASET_WHOLE_SCENE.num_extra_features
+    classifier = MODEL.get_model(NUM_CLASSES, num_extra_features).cuda()
+    checkpoint = torch.load(str(experiment_dir) + '/checkpoints' + model_name)
     classifier.load_state_dict(checkpoint['model_state_dict'])
     classifier = classifier.eval()
 
@@ -496,10 +516,8 @@ def main(args):
             else:
                 tmp = total_correct_class[l] / float(total_iou_deno_class[l])
 
-
             iou_per_class_str += 'class %s, IoU: %.3f \n' % (
-                seg_label_to_cat[l] + ' ' * (14 - len(seg_label_to_cat[l])),tmp )
-
+                seg_label_to_cat[l] + ' ' * (14 - len(seg_label_to_cat[l])), tmp)
 
         log_string(iou_per_class_str)
         log_string('eval point avg class IoU: %f' % np.mean(IoU))
