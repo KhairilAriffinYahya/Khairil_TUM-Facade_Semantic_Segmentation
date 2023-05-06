@@ -116,6 +116,13 @@ class TestCustomDataset():
 
         new_class_mapping = {1: 0, 2: 1, 3: 2, 6: 3, 13: 4, 11: 5, 7: 6, 8: 7}
 
+        if 'p' in args.geometry_features:
+            self.num_extra_features += 1
+        if 'o' in args.geometry_features:
+            self.num_extra_features += 1
+        if 'c' in args.geometry_features:
+            self.num_extra_features += 1
+
         for files in self.file_list:
             file_path = os.path.join(root, files)
             # Read LAS file
@@ -124,17 +131,13 @@ class TestCustomDataset():
             points = np.vstack((in_file.x, in_file.y, in_file.z)).T
             labels = np.array(in_file.classification, dtype=np.int32)
             if args.calculate_geometry is False:
-                self.num_extra_features = 0
                 if 'p' in args.geometry_features:
-                    self.num_extra_features += 1
                     tmp_p = np.array(in_file.planarity, dtype=np.float64)
                     self.lp_data.append(tmp_p)
                 if 'o' in args.geometry_features:
-                    self.num_extra_features += 1
                     tmp_o = np.array(in_file.Omnivariance, dtype=np.float64)
                     self.lo_data.append(tmp_o)
                 if 'c' in args.geometry_features:
-                    self.num_extra_features += 1
                     tmp_c = np.array(in_file.surface_variation, dtype=np.float64)
                     self.lc_data.append(tmp_c)
 

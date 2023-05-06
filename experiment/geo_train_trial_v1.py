@@ -117,6 +117,13 @@ class TrainCustomDataset(Dataset):
 
         new_class_mapping = {1: 0, 2: 1, 3: 2, 6: 3, 13: 4, 11: 5, 7: 6, 8: 7}
 
+        if 'p' in args.geometry_features:
+            self.num_extra_features += 1
+        if 'o' in args.geometry_features:
+            self.num_extra_features += 1
+        if 'c' in args.geometry_features:
+            self.num_extra_features += 1
+
         for room_path in rooms:
             # Read LAS file
             print("Reading = " + room_path)
@@ -126,15 +133,12 @@ class TrainCustomDataset(Dataset):
             if args.calculate_geometry is False:
                 self.num_extra_features = 0
                 if 'p' in args.geometry_features:
-                    self.num_extra_features += 1
                     tmp_p = np.array(las_data.planarity, dtype=np.float64)
                     self.lp_data.append(tmp_p)
                 if 'o' in args.geometry_features:
-                    self.num_extra_features += 1
                     tmp_o = np.array(las_data.Omnivariance, dtype=np.float64)
                     self.lo_data.append(tmp_o)
                 if 'c' in args.geometry_features:
-                    self.num_extra_features += 1
                     tmp_c = np.array(las_data.surface_variation, dtype=np.float64)
                     self.lc_data.append(tmp_c)
 
