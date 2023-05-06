@@ -387,6 +387,8 @@ def main(args):
     classifier.load_state_dict(checkpoint['model_state_dict'])
     classifier = classifier.eval()
 
+    num_of_features = 6 + num_extra_features
+
     with torch.no_grad():
         scene_id = TEST_DATASET_WHOLE_SCENE.file_list
         scene_id = [x[:-4] for x in scene_id]
@@ -413,7 +415,7 @@ def main(args):
                 scene_data, scene_label, scene_smpw, scene_point_index = TEST_DATASET_WHOLE_SCENE[batch_idx]
                 num_blocks = scene_data.shape[0]
                 s_batch_num = (num_blocks + BATCH_SIZE - 1) // BATCH_SIZE
-                batch_data = np.zeros((BATCH_SIZE, NUM_POINT, 6))  # Change to 6 (from 9) as there's no color
+                batch_data = np.zeros((BATCH_SIZE, NUM_POINT, num_of_features))  # Change to number of features being used 6+x
 
                 batch_label = np.zeros((BATCH_SIZE, NUM_POINT))
                 batch_point_index = np.zeros((BATCH_SIZE, NUM_POINT))
