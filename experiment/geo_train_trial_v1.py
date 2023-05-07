@@ -131,7 +131,6 @@ class TrainCustomDataset(Dataset):
             coords = np.vstack((las_data.x, las_data.y, las_data.z)).transpose()
             labels = np.array(las_data.classification, dtype=np.uint8)
             if args.calculate_geometry is False:
-                self.num_extra_features = 0
                 if 'p' in args.geometry_features:
                     tmp_p = np.array(las_data.planarity, dtype=np.float64)
                     self.lp_data.append(tmp_p)
