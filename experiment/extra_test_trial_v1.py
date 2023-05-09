@@ -14,7 +14,6 @@ import pickle
 import h5py
 from models.localfunctions import timePrint, CurrentTime
 import pytz
-from geofunction import cal_geofeature
 import matplotlib.pyplot as plt
 import time
 
@@ -61,16 +60,13 @@ def parse_args():
     parser.add_argument('--model', type=str, default='pointnet2_sem_seg_geo_trial',
                         help='model name [default: pointnet_sem_seg]')
     parser.add_argument('--output_model', type=str, default='/best_model.pth', help='model output name')
-    parser.add_argument('--rootdir', type=str, default='/content/drive/MyDrive/ data/tum/tum-facade/training/cc_selected/',
+    parser.add_argument('--rootdir', type=str, default='/content/drive/MyDrive/ data/tum/tum-facade/training/gml_selected/',
                         help='directory to data')
     parser.add_argument('--load', type=bool, default=False, help='load saved data or new')
     parser.add_argument('--save', type=bool, default=False, help='save data')
     parser.add_argument('--visualizeModel', type=str, default=False, help='directory to data')
-    parser.add_argument('--downsample', type=bool, default=False, help='downsample data')
-    parser.add_argument('--calculate_geometry', type=bool, default=False, help='decide where to calculate geometry')
-    parser.add_argument('--geometry_features', type=list, default=['p', 'o', 'c'],
-                        help='select which geometry_features to add')
-
+    parser.add_argument('--extra_features', type=list, default=['name1'], help='select which features  to add')
+    
     return parser.parse_args()
 
 
@@ -100,9 +96,8 @@ class TestCustomDataset():
         self.num_extra_features = 0
 
         # For Geometric Features
-        self.lp_data = []
-        self.lo_data = []
-        self.lc_data = []
+        self.extra_features = []
+        self.extra_features_data = []
         self.non_index = []
 
         # Return early if las_file_list is None
@@ -115,12 +110,10 @@ class TestCustomDataset():
 
         new_class_mapping = {1: 0, 2: 1, 3: 2, 6: 3, 13: 4, 11: 5, 7: 6, 8: 7}
 
-        if 'p' in args.geometry_features:
+        for feature in args.extra_features:
+            self.extra_features.append(feature)
             self.num_extra_features += 1
-        if 'o' in args.geometry_features:
-            self.num_extra_features += 1
-        if 'c' in args.geometry_features:
-            self.num_extra_features += 1
+
 
         for files in self.file_list:
             file_path = os.path.join(root, files)
@@ -129,16 +122,15 @@ class TestCustomDataset():
             in_file = laspy.read(file_path)
             points = np.vstack((in_file.x, in_file.y, in_file.z)).T
             labels = np.array(in_file.classification, dtype=np.int32)
-            if args.calculate_geometry is False:
-                if 'p' in args.geometry_features:
-                    tmp_p = np.array(in_file.planarity, dtype=np.float64)
-                    self.lp_data.append(tmp_p)
-                if 'o' in args.geometry_features:
-                    tmp_o = np.array(in_file.Omnivariance, dtype=np.float64)
-                    self.lo_data.append(tmp_o)
-                if 'c' in args.geometry_features:
-                    tmp_c = np.array(in_file.surface_variation, dtype=np.float64)
-                    self.lc_data.append(tmp_c)
+            
+            tmp_features=np.zeros(len(args.extra_features))
+            ix = 0
+            for feature in args.extra_features:
+                tmp_features[ix] = np.array(las_data.feature, dtype=np.float64)
+                ix += 1
+            if self.num_extra_features > 0:
+                self.extra_features_data.append(tmp_features)
+            
 
             # Merge labels as per instructions
             labels[(labels == 5) | (labels == 6)] = 6  # Merge molding and decoration
@@ -176,6 +168,9 @@ class TestCustomDataset():
         grid_y = int(np.ceil(float(coord_max[1] - coord_min[1] - self.block_size) / self.stride) + 1)
         data_room, label_room, sample_weight, index_room = np.array([]), np.array([]), np.array([]), np.array([])
 
+        extra_num = self.num_extra_features
+        extra_names = self.extra_features
+
         for index_y in range(grid_y):
             for index_x in range(grid_x):
                 s_x = coord_min[0] + index_x * self.stride
@@ -204,21 +199,17 @@ class TestCustomDataset():
                 data_batch[:, 1] = data_batch[:, 1] - (s_y + self.block_size / 2.0)
                 data_batch = np.concatenate((data_batch, normlized_xyz), axis=1)
 
-                geo_features = []
-                if 'p' in args.geometry_features:  # Load the lp features
-                    lp_room = self.lp_data[index]
-                    selected_lp = lp_room[point_idxs]  # num_point * lp_features
-                    geo_features.append(selected_lp)
-                if 'o' in args.geometry_features:  # Load the lo features
-                    lo_room = self.lo_data[index]
-                    selected_lo = lo_room[point_idxs]  # num_point * lo_features
-                    geo_features.append(selected_lo)
-                if 'c' in args.geometry_features:  # Load the lc features
-                    lc_room = self.lc_data[index]
-                    selected_lc = lc_room[point_idxs]  # num_point * lc_features
-                    geo_features.append(selected_lc)
-                tmp_features = np.array(geo_features).reshape(-1, 1)
-                data_batch = np.concatenate((data_batch, tmp_features), axis=1)
+                tmp_features = []
+                for ix in  range(extra_names):
+                    f = extra_names[ix]
+                    features_room = self.extra_features_data[index] # Load the features
+                    features_points = features_room[ix]
+                    selected_feature = features_points[point_idxs]  # num_point * lp_features
+                    tmp_features.append(selected_feature)
+                    num_of_features += 1
+
+                tmp_np_features = np.array(tmp_features).reshape(-1, 1)
+                data_batch = np.concatenate((data_batch, tmp_np_features), axis=1)
 
                 label_batch = labels[point_idxs].astype(int)
                 batch_weight = self.labelweights[label_batch]
@@ -247,7 +238,7 @@ class TestCustomDataset():
     def index_update(self, newIndices):
         self.semantic_labels_list = newIndices
 
-    def copy(self, new_indices=None):
+    def copy(self, new_indices=None): #Copy target dataset but adjust index if needed
         new_dataset = TestCustomDataset()
         new_dataset.block_points = self.block_points
         new_dataset.block_size = self.block_size
@@ -257,11 +248,10 @@ class TestCustomDataset():
         new_dataset.num_classes = self.num_classes
         new_dataset.room_coord_min = self.room_coord_min
         new_dataset.room_coord_max = self.room_coord_max
-        new_dataset.lp_data = self.lp_data
-        new_dataset.lo_data = self.lo_data
-        new_dataset.lc_data = self.lc_data
         new_dataset.non_index = self.non_index
         new_dataset.num_extra_features = self.num_extra_features
+        new_dataset.extra_features_data = self.extra_features_data
+        new_dataset.extra_features = self.extra_features
 
         new_dataset.scene_points_list = [self.scene_points_list[i] for i in new_indices]
         new_dataset.semantic_labels_list = [self.semantic_labels_list[i] for i in new_indices]
@@ -354,13 +344,6 @@ def main(args):
         print("start loading test data ...")
         TEST_DATASET_WHOLE_SCENE = TestCustomDataset(root, test_file, num_classes=NUM_CLASSES, block_points=NUM_POINT)
         log_string("The number of test data is: %d" % len(TEST_DATASET_WHOLE_SCENE))
-
-        if args.calculate_geometry is True:
-            print("room_idx test")
-            print(len(TEST_DATASET_WHOLE_SCENE))
-            cal_geofeature(TEST_DATASET_WHOLE_SCENE, args.downsample, args.visualizeModel)
-            print("geometric room_idx test")
-            print(len(TEST_DATASET_WHOLE_SCENE))
     else:
         TEST_DATASET_WHOLE_SCENE = TestCustomDataset.load_data(saveDir + saveTest)
 
@@ -391,6 +374,7 @@ def main(args):
 
     num_of_features = 6 + num_extra_features
 
+    '''Deep learning test'''
     with torch.no_grad():
         scene_id = TEST_DATASET_WHOLE_SCENE.file_list
         scene_id = [x[:-4] for x in scene_id]

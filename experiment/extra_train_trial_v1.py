@@ -22,7 +22,6 @@ import pickle
 import h5py
 from models.localfunctions import timePrint, CurrentTime, inplace_relu, modelTraining
 import pytz
-from geofunction import cal_geofeature
 
 '''Adjust permanent/file/static variables here'''
 
@@ -69,16 +68,12 @@ def parse_args():
     parser.add_argument('--test_area', type=str, default='cc_o_DEBY_LOD2_4959323.las',
                         help='Which area to use for test, option: 1-6 [default: 5]')
     parser.add_argument('--output_model', type=str, default='/best_model.pth', help='model output name')
-    parser.add_argument('--rootdir', type=str,
-                        default='/content/drive/MyDrive/ data/tum/tum-facade/training/cc_selected/',
+    parser.add_argument('--rootdir', type=str,default='/content/drive/MyDrive/ data/tum/tum-facade/training/gml_selected/',
                         help='directory to data')
     parser.add_argument('--load', type=bool, default=False, help='load saved data or new')
     parser.add_argument('--save', type=bool, default=False, help='save data')
     parser.add_argument('--visualizeModel', type=str, default=False, help='directory to data')
-    parser.add_argument('--downsample', type=bool, default=False, help='downsample data')
-    parser.add_argument('--calculate_geometry', type=bool, default=False, help='decide where to calculate geometry')
-    parser.add_argument('--geometry_features', type=list, default=['p', 'o', 'c'],
-                        help='select which geometry_features to add')
+    parser.add_argument('--extra_features', type=list, default=['name1'], help='select which features  to add')
 
     return parser.parse_args()
 
@@ -98,9 +93,8 @@ class TrainCustomDataset(Dataset):
         range_class = num_classes + 1
 
         # For Geometric Features
-        self.lp_data = []
-        self.lo_data = []
-        self.lc_data = []
+        self.extra_features = []
+        self.extra_features_data = []
         self.non_index = []
 
         # Return early if las_file_list is None
@@ -116,12 +110,9 @@ class TrainCustomDataset(Dataset):
         labelweights = np.zeros(adjustedclass)
 
         new_class_mapping = {1: 0, 2: 1, 3: 2, 6: 3, 13: 4, 11: 5, 7: 6, 8: 7}
-
-        if 'p' in args.geometry_features:
-            self.num_extra_features += 1
-        if 'o' in args.geometry_features:
-            self.num_extra_features += 1
-        if 'c' in args.geometry_features:
+          
+        for feature in args.extra_features:
+            self.extra_features.append(feature)
             self.num_extra_features += 1
 
         for room_path in rooms:
@@ -130,17 +121,17 @@ class TrainCustomDataset(Dataset):
             las_data = laspy.read(room_path)
             coords = np.vstack((las_data.x, las_data.y, las_data.z)).transpose()
             labels = np.array(las_data.classification, dtype=np.uint8)
-            if args.calculate_geometry is False:
-                if 'p' in args.geometry_features:
-                    tmp_p = np.array(las_data.planarity, dtype=np.float64)
-                    self.lp_data.append(tmp_p)
-                if 'o' in args.geometry_features:
-                    tmp_o = np.array(las_data.Omnivariance, dtype=np.float64)
-                    self.lo_data.append(tmp_o)
-                if 'c' in args.geometry_features:
-                    tmp_c = np.array(las_data.surface_variation, dtype=np.float64)
-                    self.lc_data.append(tmp_c)
-
+        
+            tmp_features=np.zeros(len(args.extra_features))
+            ix = 0
+            for feature in args.extra_features:
+                tmp_features[ix] = np.array(las_data.feature, dtype=np.float64)
+                ix += 1
+            if self.num_extra_features > 0:
+                self.extra_features_data.append(tmp_features)
+            
+            
+            
             # Merge labels as per instructions
             labels[(labels == 5) | (labels == 6)] = 6  # Merge molding and decoration
             labels[(labels == 1) | (labels == 9) | (labels == 15) | (
@@ -182,15 +173,15 @@ class TrainCustomDataset(Dataset):
         points = self.room_points[room_idx]  # N * 6
         labels = self.room_labels[room_idx]  # N
         N_points = points.shape[0]
+        extra_num = self.num_extra_features
+        extra_names = self.extra_features
 
         while (True):
             center = points[np.random.choice(N_points)][:3]
             block_min = center - [self.block_size / 2.0, self.block_size / 2.0, 0]
             block_max = center + [self.block_size / 2.0, self.block_size / 2.0, 0]
             point_idxs = np.where((points[:, 0] >= block_min[0]) & (points[:, 0] <= block_max[0]) & (points[:, 1]
-                                                                                                     >= block_min[
-                                                                                                         1]) & (
-                                              points[:, 1] <= block_max[1]))[0]
+                                   >= block_min[1]) & (points[:, 1] <= block_max[1]))[0]
             if point_idxs.size > 1024:
                 break
 
@@ -212,31 +203,23 @@ class TrainCustomDataset(Dataset):
         num_of_features = current_points.shape[1]
         current_features = current_points
 
-        geo_features = []
-        if 'p' in args.geometry_features:
-            lp_room = self.lp_data[room_idx]
-            selected_lp = lp_room[selected_point_idxs]  # num_point * lp_features
-            geo_features.append(selected_lp)
-            num_of_features += 1
-        if 'o' in args.geometry_features:
-            lo_room = self.lo_data[room_idx]
-            selected_lo = lo_room[selected_point_idxs]  # num_point * lo_features
-            geo_features.append(selected_lo)
-            num_of_features += 1
-        if 'c' in args.geometry_features:
-            lc_room = self.lc_data[room_idx]
-            selected_lc = lc_room[selected_point_idxs]  # num_point * lc_features
-            geo_features.append(selected_lc)
+        tmp_features = []
+        for ix in  range(extra_names):
+            f = extra_names[ix]
+            features_room = self.extra_features_data[room_idx]
+            features_points = features_room[ix]
+            selected_feature = features_points[selected_point_idxs]  # num_point * lp_features
+            tmp_features.append(selected_feature)
             num_of_features += 1
 
 
-        tmp_features = np.zeros((self.num_point, num_of_features))
-        tmp_features[:, 0:current_points.shape[1]] = current_features
+        tmp_np_features = np.zeros((self.num_point, num_of_features))
+        tmp_np_features[:, 0:current_points.shape[1]] = current_features
         features_loop = num_of_features - current_points.shape[1]
         for i in range(features_loop):
             col_pointer = i + current_points.shape[1]
-            tmp_features[:, col_pointer] = geo_features[i]
-        current_features = tmp_features
+            tmp_np_features[:, col_pointer] = tmp_features[i]
+        current_features = tmp_np_features
 
         current_labels = labels[selected_point_idxs]
         if self.transform is not None:
@@ -247,7 +230,7 @@ class TrainCustomDataset(Dataset):
     def __len__(self):
         return len(self.room_idxs)
 
-    def calculate_labelweights(self):
+    def calculate_labelweights(self): #calculate weight of each label/class
         print("Calculate Weights")
         labelweights = np.zeros(self.num_classes)
         for labels in self.room_labels:
@@ -263,16 +246,17 @@ class TrainCustomDataset(Dataset):
 
         return labelweights
 
-    def filtered_indices(self):
+    def filtered_indices(self): #get new index list
         total_indices = set(range(len(self.room_points)))
         non_index_set = set(self.non_index)
         filtered_indices = list(total_indices - non_index_set)
         return filtered_indices
 
-    def index_update(self, newIndices):
+    def index_update(self, newIndices): #adjust index
         self.room_idxs = newIndices
 
     def copy(self, indices=None):
+        #COPY EVERYTHING EXCEPT FOR INDEX
         copied_dataset = TrainCustomDataset()
         copied_dataset.num_point = self.num_point
         copied_dataset.block_size = self.block_size
@@ -283,15 +267,15 @@ class TrainCustomDataset(Dataset):
         copied_dataset.room_coord_min = self.room_coord_min.copy()
         copied_dataset.room_coord_max = self.room_coord_max.copy()
         copied_dataset.num_extra_features = self.num_extra_features
+        copied_dataset.extra_features_data = self.extra_features_data
+        copied_dataset.extra_features = self.extra_features
 
+        #Index to be adjusted
         if indices is not None:
             copied_dataset.room_idxs = self.room_idxs[indices]
         else:
             copied_dataset.room_idxs = self.room_idxs.copy()
 
-        copied_dataset.lp_data = self.lp_data
-        copied_dataset.lo_data = self.lo_data
-        copied_dataset.lc_data = self.lc_data
 
         print("Totally {} samples in dataset.".format(len(copied_dataset.room_idxs)))
         return copied_dataset
@@ -380,29 +364,9 @@ def main(args):
 
         print("start loading training data ...")
         TRAIN_DATASET = lidar_dataset.copy(indices=train_indices)
-
-        if args.calculate_geometry is True:
-            print("room_idx training")
-            print(len(TRAIN_DATASET.room_idxs))
-            cal_geofeature(TRAIN_DATASET, args.downsample, args.visualizeModel)
-            print("geometric room_idx training")
-            print(TRAIN_DATASET.room_idxs)
-            print(len(TRAIN_DATASET.room_idxs))
-
-            timePrint(start)
-            CurrentTime(timezone)
-
         # Evaluation DATASET
         print("start loading evalaution data ...")
         EVAL_DATASET = lidar_dataset.copy(indices=eval_indices)
-
-        if args.calculate_geometry is True:
-            print("room_idx evaluation")
-            print(len(EVAL_DATASET.room_idxs))
-            cal_geofeature(EVAL_DATASET, args.downsample, args.visualizeModel)
-            print("geometric room_idx evaluation")
-            print(len(EVAL_DATASET))
-
         timePrint(start)
         CurrentTime(timezone)
 
@@ -423,8 +387,7 @@ def main(args):
         CurrentTime(timezone)
 
     trainDataLoader = DataLoader(TRAIN_DATASET, batch_size=BATCH_SIZE, shuffle=True, num_workers=8,
-                                 pin_memory=True, drop_last=True,
-                                 worker_init_fn=lambda x: np.random.seed(x + int(time.time())))
+                                 pin_memory=True, drop_last=True,worker_init_fn=lambda x: np.random.seed(x + int(time.time())))
     evalDataLoader = DataLoader(EVAL_DATASET, batch_size=BATCH_SIZE, shuffle=False, num_workers=8,
                                 pin_memory=True, drop_last=True)
 
@@ -477,8 +440,7 @@ def main(args):
             lr=args.learning_rate,
             betas=(0.9, 0.999),
             eps=1e-08,
-            weight_decay=args.decay_rate
-        )
+            weight_decay=args.decay_rate)
     else:
         optimizer = torch.optim.SGD(classifier.parameters(), lr=args.learning_rate, momentum=0.9)
 
@@ -496,8 +458,8 @@ def main(args):
     CurrentTime(timezone)
 
     accuracyChart = modelTraining(start_epoch, args.epoch, args.learning_rate, args.lr_decay, args.step_size,
-                                  BATCH_SIZE,NUM_POINT, NUM_CLASSES, trainDataLoader, evalDataLoader, classifier, optimizer,
-                                  criterion,train_weights, checkpoints_dir, model_name, seg_label_to_cat, logger)
+                                  BATCH_SIZE, NUM_POINT, NUM_CLASSES, trainDataLoader, evalDataLoader, classifier, optimizer,
+                                  criterion, train_weights, checkpoints_dir, model_name, seg_label_to_cat, logger)
 
     return accuracyChart
 
@@ -510,13 +472,12 @@ if __name__ == '__main__':
     max_value = max(accuracyChart)
     max_index = accuracyChart.index(max_value)
 
-    print("Best model = %d"%max_index)
+    print(max_index)
+    end = time.time()
+    timetaken = end - start
+    sec = timetaken % 60
+    t1 = timetaken / 60
+    mint = t1 % 60
+    hour = t1 / 60
 
-    xpoints = np.array(accuracyChart)
-    ypoints = np.array(accuracyChart.index)
-
-    plt.plot(xpoints, ypoints)
-    plt.show()
-
-    timePrint(start)
-    CurrentTime(timezone)
+    print("Time taken = %i:%i:%i" % (hour, mint, sec))
