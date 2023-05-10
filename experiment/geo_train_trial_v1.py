@@ -511,10 +511,10 @@ if __name__ == '__main__':
 
     print("Best model = %d"%max_index)
 
-    xpoints = np.array(accuracyChart)
-    ypoints = np.array(accuracyChart.index)
+    #xpoints = np.array(accuracyChart)
+    #ypoints = np.array(accuracyChart.index)
 
-    plt.plot(xpoints, ypoints)
+    plt.plot(accuracyChart)
     plt.show()
 
     timePrint(start)
