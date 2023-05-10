@@ -514,7 +514,7 @@ if __name__ == '__main__':
     #xpoints = np.array(accuracyChart)
     #ypoints = np.array(accuracyChart.index)
 
-    plt.plot(accuracyChart)
+    plt.plot(np.array(accuracyChart))
     plt.show()
 
     timePrint(start)
