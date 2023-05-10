@@ -2,20 +2,20 @@ import argparse
 import os
 import torch
 import logging
-from pathlib import Path
 import sys
 import importlib
-from tqdm import tqdm
 import laspy
 import glob
 import numpy as np
-import open3d as o3d
-import pickle
-import h5py
-from models.localfunctions import timePrint, CurrentTime
 import pytz
+import pickle
+import open3d as o3d
+import h5py
 import matplotlib.pyplot as plt
 import time
+from models.localfunctions import timePrint, CurrentTime, modelTesting
+from pathlib import Path
+from tqdm import tqdm
 
 '''Adjust permanent/file/static variables here'''
 
@@ -374,7 +374,7 @@ def main(args):
 
     num_of_features = 6 + num_extra_features
 
-    '''Deep learning test'''
+    '''Model testing'''
     with torch.no_grad():
         scene_id = TEST_DATASET_WHOLE_SCENE.file_list
         scene_id = [x[:-4] for x in scene_id]
@@ -460,23 +460,24 @@ def main(args):
                 fout.close()
                 fout_gt.close()
 
-        IoU = np.array(total_correct_class) / (np.array(total_iou_deno_class, dtype=np.float) + 1e-6)
+            CurrentTime(timezone)
+
+        IoU = np.array(total_correct_class) / (np.array(total_iou_deno_class, dtype=float) + 1e-6)
         iou_per_class_str = '------- IoU --------\n'
         for l in range(NUM_CLASSES):
             tmp = float(total_iou_deno_class[l])
-
             if tmp == 0:
                 tmp = 0
             else:
                 tmp = total_correct_class[l] / float(total_iou_deno_class[l])
-
             iou_per_class_str += 'class %s, IoU: %.3f \n' % (
-                seg_label_to_cat[l] + ' ' * (14 - len(seg_label_to_cat[l])), tmp)
+                seg_label_to_cat[l] + ' ' * (14 - len(seg_label_to_cat[l])),tmp )
 
+        # Logging results
         log_string(iou_per_class_str)
         log_string('eval point avg class IoU: %f' % np.mean(IoU))
         log_string('eval whole scene point avg class acc: %f' % (
-            np.mean(np.array(total_correct_class) / (np.array(total_seen_class, dtype=np.float) + 1e-6))))
+            np.mean(np.array(total_correct_class) / (np.array(total_seen_class, dtype=float) + 1e-6))))
         log_string('eval whole scene point accuracy: %f' % (
                 np.sum(total_correct_class) / float(np.sum(total_seen_class) + 1e-6)))
 
@@ -486,3 +487,7 @@ def main(args):
 if __name__ == '__main__':
     args = parse_args()
     main(args)
+    start = time.time()
+
+    timePrint(start)
+    CurrentTime(timezone)

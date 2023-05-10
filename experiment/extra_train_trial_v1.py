@@ -7,21 +7,21 @@ from pathlib import Path
 import sys
 import importlib
 import shutil
-import provider
+import pytz
 import numpy as np
-import time
-from tqdm import tqdm
 import laspy
 import glob
-from collections import Counter
-from torch.utils.data import Dataset, DataLoader, random_split
 import matplotlib.pyplot as plt
 import time
-import open3d as o3d
 import pickle
 import h5py
+import provider
+import open3d as o3d
+from tqdm import tqdm
 from models.localfunctions import timePrint, CurrentTime, inplace_relu, modelTraining
-import pytz
+from collections import Counter
+from torch.utils.data import Dataset, DataLoader, random_split
+
 
 '''Adjust permanent/file/static variables here'''
 
@@ -472,12 +472,13 @@ if __name__ == '__main__':
     max_value = max(accuracyChart)
     max_index = accuracyChart.index(max_value)
 
-    print(max_index)
-    end = time.time()
-    timetaken = end - start
-    sec = timetaken % 60
-    t1 = timetaken / 60
-    mint = t1 % 60
-    hour = t1 / 60
+    print("Best model = %d"%max_index)
 
-    print("Time taken = %i:%i:%i" % (hour, mint, sec))
+    xpoints = np.array(accuracyChart)
+    ypoints = np.array(accuracyChart.index)
+
+    plt.plot(xpoints, ypoints)
+    plt.show()
+
+    timePrint(start)
+    CurrentTime(timezone)

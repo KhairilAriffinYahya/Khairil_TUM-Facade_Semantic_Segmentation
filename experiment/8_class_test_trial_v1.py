@@ -2,19 +2,19 @@ import argparse
 import os
 import torch
 import logging
-from pathlib import Path
 import sys
 import importlib
-from tqdm import tqdm
 import laspy
 import glob
 import numpy as np
 import time
 import pickle
+import pytz
 import open3d as o3d
 import h5py
-from models.localfunctions import timePrint, CurrentTime, add_vote
-import pytz
+from models.localfunctions import timePrint, CurrentTime, add_vote, modelTesting
+from pathlib import Path
+from tqdm import tqdm
 
 '''Adjust permanent/file/static variables here'''
 
@@ -315,7 +315,7 @@ def main(args):
     classifier.load_state_dict(checkpoint['model_state_dict'])
     classifier = classifier.eval()
 
-    '''Testing'''
+    '''Model testing'''
     with torch.no_grad():
         scene_id = TEST_DATASET_WHOLE_SCENE.file_list
         scene_id = [x[:-4] for x in scene_id]
@@ -367,8 +367,6 @@ def main(args):
                                                batch_pred_label[0:real_batch_size, ...],
                                                batch_smpw[0:real_batch_size, ...])
 
-            CurrentTime(timezone)
-
             pred_label = np.argmax(vote_label_pool, 1)
 
             for l in range(NUM_CLASSES):
@@ -403,21 +401,20 @@ def main(args):
                 fout.close()
                 fout_gt.close()
 
+            CurrentTime(timezone)
+
         IoU = np.array(total_correct_class) / (np.array(total_iou_deno_class, dtype=float) + 1e-6)
         iou_per_class_str = '------- IoU --------\n'
         for l in range(NUM_CLASSES):
             tmp = float(total_iou_deno_class[l])
-
             if tmp == 0:
                 tmp = 0
             else:
                 tmp = total_correct_class[l] / float(total_iou_deno_class[l])
-
-
             iou_per_class_str += 'class %s, IoU: %.3f \n' % (
                 seg_label_to_cat[l] + ' ' * (14 - len(seg_label_to_cat[l])),tmp )
 
-
+        # Logging results
         log_string(iou_per_class_str)
         log_string('eval point avg class IoU: %f' % np.mean(IoU))
         log_string('eval whole scene point avg class acc: %f' % (
@@ -431,3 +428,7 @@ def main(args):
 if __name__ == '__main__':
     args = parse_args()
     main(args)
+    start = time.time()
+
+    timePrint(start)
+    CurrentTime(timezone)

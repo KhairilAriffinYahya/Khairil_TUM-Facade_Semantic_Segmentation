@@ -3,25 +3,24 @@ import os
 import torch
 import datetime
 import logging
-from pathlib import Path
 import sys
 import importlib
 import shutil
-import provider
 import numpy as np
-import time
-from tqdm import tqdm
 import laspy
 import glob
-from collections import Counter
-from torch.utils.data import Dataset, DataLoader, random_split
 import matplotlib.pyplot as plt
 import time
 import pickle
+import pytz
 import open3d as o3d
 import h5py
+import provider
 from models.localfunctions import timePrint, CurrentTime, inplace_relu, modelTraining
-import pytz
+from collections import Counter
+from torch.utils.data import Dataset, DataLoader, random_split
+from pathlib import Path
+from tqdm import tqdm
 
 '''Adjust permanent/file/static variables here'''
 
@@ -390,7 +389,13 @@ if __name__ == '__main__':
     max_value = max(accuracyChart)
     max_index = accuracyChart.index(max_value)
 
-    print(max_index)
-    print("Training Complete")
+    print("Best model = %d"%max_index)
+
+    xpoints = np.array(accuracyChart)
+    ypoints = np.array(accuracyChart.index)
+
+    plt.plot(xpoints, ypoints)
+    plt.show()
+
     timePrint(start)
     CurrentTime(timezone)
