@@ -349,7 +349,7 @@ def modelTesting(dataset, NUM_CLASSES, NUM_POINT, BATCH_SIZE, args, timezone,
 
         CurrentTime(timezone)
 
-    IoU = np.array(total_correct_class) / (np.array(total_iou_deno_class, dtype=float) + 1e-6)
+    IoU = np.array(total_correct_class) / (np.array(total_iou_deno_class, dtype=np.float64) + 1e-6)
     iou_per_class_str = '------- IoU --------\n'
     for l in range(NUM_CLASSES):
         tmp = float(total_iou_deno_class[l])
@@ -364,6 +364,6 @@ def modelTesting(dataset, NUM_CLASSES, NUM_POINT, BATCH_SIZE, args, timezone,
     log_string(iou_per_class_str)
     log_string('eval point avg class IoU: %f' % np.mean(IoU))
     log_string('eval whole scene point avg class acc: %f' % (
-        np.mean(np.array(total_correct_class) / (np.array(total_seen_class, dtype=float) + 1e-6))))
+        np.mean(np.array(total_correct_class) / (np.array(total_seen_class, dtype=np.float64) + 1e-6))))
     log_string('eval whole scene point accuracy: %f' % (
             np.sum(total_correct_class) / float(np.sum(total_seen_class) + 1e-6)))
