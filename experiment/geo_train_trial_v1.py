@@ -510,7 +510,9 @@ if __name__ == '__main__':
     max_index = accuracyChart.index(max_value)
 
     print("Best model = %d"%max_index)
-    os.environ['accuracychart'] = accuracyChart
+    plt.plot(accuracyChart)
+    plt.show()
+
 
     timePrint(start)
     CurrentTime(timezone)
