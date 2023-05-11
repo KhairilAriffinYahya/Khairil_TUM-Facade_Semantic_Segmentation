@@ -58,7 +58,7 @@ def parse_args():
                         help='area for testing, option: 1-6 [default: 5]')
     parser.add_argument('--num_votes', type=int, default=5,
                         help='aggregate segmentation scores with voting [default: 5]')
-    parser.add_argument('--model', type=str, default='pointnet2_sem_seg_geo_trial',
+    parser.add_argument('--model', type=str, default='pointnet2_sem_seg_extra_feature_trial',
                         help='model name [default: pointnet_sem_seg]')
     parser.add_argument('--output_model', type=str, default='/best_model.pth', help='model output name')
     parser.add_argument('--rootdir', type=str, default='/content/drive/MyDrive/ data/tum/tum-facade/training/cc_selected/',

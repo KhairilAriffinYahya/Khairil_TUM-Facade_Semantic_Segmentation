@@ -44,6 +44,8 @@ print(seg_label_to_cat)
 def parse_args():
     '''PARAMETERS'''
     parser = argparse.ArgumentParser('Model')
+    parser.add_argument('--model', type=str, default='pointnet2_sem_seg_extra_feature_trial',
+                        help='model name [default: pointnet_sem_seg]')
     parser.add_argument('--batch_size', type=int, default=32, help='batch size in testing [default: 32]')
     parser.add_argument('--gpu', type=str, default='0', help='specify gpu device')
     parser.add_argument('--num_point', type=int, default=4096, help='point number [default: 4096]')
@@ -52,7 +54,6 @@ def parse_args():
     parser.add_argument('--visual', action='store_true', default=False, help='visualize result [default: False]')
     parser.add_argument('--test_area', type=str, default='DEBY_LOD2_4959323.las', help='area for testing, option: 1-6 [default: 5]')
     parser.add_argument('--num_votes', type=int, default=5, help='aggregate segmentation scores with voting [default: 5]')
-    parser.add_argument('--model', type=str, default='pointnet2_sem_seg_trial', help='model name [default: pointnet_sem_seg]')
     parser.add_argument('--output_model', type=str, default='/best_model.pth', help='model output name')
     parser.add_argument('--rootdir', type=str, default='/content/Khairil_PN2_experiment/experiment/test_data/Normal/', help='directory to data')
     parser.add_argument('--load', type=bool, default=False, help='load saved data or new')
@@ -299,7 +300,9 @@ def main(args):
         model_dir = tmp_model
     print(model_dir)
     MODEL = importlib.import_module(model_dir)
-    classifier = MODEL.get_model(NUM_CLASSES).cuda()
+    num_extra_features = 0
+    print("number = %d" % num_extra_features)
+    classifier = MODEL.get_model(NUM_CLASSES, num_extra_features).cuda()  # name sensitive but not case sensitive
     checkpoint = torch.load(str(experiment_dir) + '/checkpoints'+model_name)
     classifier.load_state_dict(checkpoint['model_state_dict'])
     classifier = classifier.eval()

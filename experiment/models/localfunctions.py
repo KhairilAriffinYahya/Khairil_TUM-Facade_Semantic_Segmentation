@@ -313,6 +313,8 @@ def modelTesting(dataset, NUM_CLASSES, NUM_POINT, BATCH_SIZE, args, timezone,
                                            batch_pred_label[0:real_batch_size, ...],
                                            batch_smpw[0:real_batch_size, ...])
 
+                CurrentTime(timezone)
+
         pred_label = np.argmax(vote_label_pool, 1)
 
         for l in range(NUM_CLASSES):
@@ -347,7 +349,6 @@ def modelTesting(dataset, NUM_CLASSES, NUM_POINT, BATCH_SIZE, args, timezone,
             fout.close()
             fout_gt.close()
 
-        CurrentTime(timezone)
 
     IoU = np.array(total_correct_class) / (np.array(total_iou_deno_class, dtype=np.float64) + 1e-6)
     iou_per_class_str = '------- IoU --------\n'

@@ -50,7 +50,8 @@ print(seg_label_to_cat)
 # Adjust parameters here if there no changes to reduce line
 def parse_args():
     parser = argparse.ArgumentParser('Model')
-    parser.add_argument('--model', type=str, default='pointnet2_sem_seg_trial', help='model name [default: pointnet_sem_seg]')
+    parser.add_argument('--model', type=str, default='pointnet2_sem_seg_extra_feature_trial',
+                        help='model name [default: pointnet_sem_seg]')
     parser.add_argument('--batch_size', type=int, default=16, help='Batch Size during training [default: 16]')
     parser.add_argument('--epoch', default=32, type=int, help='Epoch to run [default: 32]')
     parser.add_argument('--learning_rate', default=0.001, type=float, help='Initial learning rate [default: 0.001]')
@@ -339,7 +340,9 @@ def main(args):
     shutil.copy('models/%s.py' % args.model, str(experiment_dir))
     shutil.copy('models/pointnet2_utils.py', str(experiment_dir))
 
-    classifier = MODEL.get_model(NUM_CLASSES).cuda()
+    num_extra_features = 0
+    print("number = %d" % num_extra_features)
+    classifier = MODEL.get_model(NUM_CLASSES, num_extra_features).cuda()  # name sensitive but not case sensitive
     criterion = MODEL.get_loss().cuda()
     classifier.apply(inplace_relu)
     model_name = args.output_model
