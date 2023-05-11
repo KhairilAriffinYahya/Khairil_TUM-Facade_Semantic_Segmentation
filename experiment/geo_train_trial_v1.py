@@ -510,12 +510,7 @@ if __name__ == '__main__':
     max_index = accuracyChart.index(max_value)
 
     print("Best model = %d"%max_index)
-
-    #xpoints = np.array(accuracyChart)
-    #ypoints = np.array(accuracyChart.index)
-
-    plt.plot(np.array(accuracyChart))
-    plt.show()
+    os.environ['accuracychart'] = accuracyChart
 
     timePrint(start)
     CurrentTime(timezone)
