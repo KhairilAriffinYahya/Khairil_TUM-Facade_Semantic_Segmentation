@@ -285,6 +285,7 @@ def modelTesting(dataset, NUM_CLASSES, NUM_POINT, BATCH_SIZE, args, timezone,
         vote_label_pool = np.zeros((whole_scene_label.shape[0], NUM_CLASSES))
 
         for _ in tqdm(range(args.num_votes), total=args.num_votes):
+            CurrentTime(timezone)
             scene_data, scene_label, scene_smpw, scene_point_index = dataset[batch_idx]
             num_blocks = scene_data.shape[0]
             s_batch_num = (num_blocks + BATCH_SIZE - 1) // BATCH_SIZE
@@ -313,7 +314,7 @@ def modelTesting(dataset, NUM_CLASSES, NUM_POINT, BATCH_SIZE, args, timezone,
                                            batch_pred_label[0:real_batch_size, ...],
                                            batch_smpw[0:real_batch_size, ...])
 
-                CurrentTime(timezone)
+
 
         pred_label = np.argmax(vote_label_pool, 1)
 
