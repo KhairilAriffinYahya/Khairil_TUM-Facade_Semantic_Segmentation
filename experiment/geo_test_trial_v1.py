@@ -88,6 +88,7 @@ class TestCustomDataset():
         self.room_coord_min, self.room_coord_max = [], []
         self.labelweights = np.zeros(num_classes)
         self.num_extra_features = 0
+        self.num_classes = num_classes
 
         # For Geometric Features
         self.lp_data = []
@@ -234,8 +235,27 @@ class TestCustomDataset():
         filtered_indices = list(total_indices - non_index_set)
         return filtered_indices
 
-    def index_update(self, newIndices):
-        self.semantic_labels_list = newIndices
+    def index_update(self, new_indices):
+        tmp_scene_points_num = []
+        tmp_scene_points_list = [self.scene_points_list[i] for i in new_indices]
+        tmp_semantic_labels_list = [self.semantic_labels_list[i] for i in new_indices]
+
+        self.scene_points_list = tmp_scene_points_list
+        self.semantic_labels_list = tmp_semantic_labels_list
+
+        # Recompute labelweights
+        num_classes = len(self.labelweights)
+        assert num_classes == self.num_classes
+        labelweights = np.zeros(num_classes)
+        for seg in tmp_semantic_labels_list:
+            tmp, _ = np.histogram(seg, range(num_classes + 1))
+            tmp_scene_points_num.append(seg.shape[0])
+            labelweights += tmp
+        labelweights = labelweights.astype(np.float32)
+        labelweights = labelweights / np.sum(labelweights)
+        self.labelweights = np.power(np.amax(labelweights) / labelweights, 1 / 3.0)
+        self.scene_points_num = tmp_scene_points_num
+
 
     def copy(self, new_indices=None):
         new_dataset = TestCustomDataset()
@@ -340,10 +360,9 @@ def main(args):
     '''Dataset'''
     testdatatime = time.time()
 
+    print("start loading test data ...")
     if args.load is False:
-        print("start loading test data ...")
         TEST_DATASET_WHOLE_SCENE = TestCustomDataset(root, test_file, num_classes=NUM_CLASSES, block_points=NUM_POINT)
-        log_string("The number of test data is: %d" % len(TEST_DATASET_WHOLE_SCENE))
 
         if args.calculate_geometry is True:
             print("room_idx test")
@@ -354,6 +373,7 @@ def main(args):
     else:
         TEST_DATASET_WHOLE_SCENE = TestCustomDataset.load_data(saveDir + saveTest)
 
+    log_string("The number of test data is: %d" % len(TEST_DATASET_WHOLE_SCENE))
     timePrint(testdatatime)
     CurrentTime(timezone)
 

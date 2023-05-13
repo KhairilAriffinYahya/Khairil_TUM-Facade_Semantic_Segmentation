@@ -82,10 +82,11 @@ class TrainCustomDataset(Dataset):
         self.num_classes = num_classes
         self.room_points, self.room_labels = [], []
         self.room_coord_min, self.room_coord_max = [], []
-        self.room_idxs = np.array([])
+
 
         # Return early if las_file_list is None
         if las_file_list is None:
+            self.room_idxs = np.array([])
             return
 
         adjustedclass = num_classes
@@ -267,8 +268,9 @@ def main(args):
     log_string(args)
 
     '''Load Dataset'''
+    loadtime=time.time()
+
     if args.load is False:
-        datasetTime = time.time()
         lidar_dataset = TrainCustomDataset(las_file_list, num_classes=NUM_CLASSES, num_point=NUM_POINT, transform=None)
         print("Dataset taken")
 
@@ -282,18 +284,15 @@ def main(args):
 
         print("start loading eval data ...")
         EVAL_DATASET = lidar_dataset.copy(indices=eval_indices)
-
-        timePrint(datasetTime)
-        CurrentTime(timezone)
     else:
         print("Load previously saved dataset")
-        loadtime=time.time()
         TRAIN_DATASET=TrainCustomDataset.load_data(saveDir+saveTrain)
-        print("Total {} samples in training dataset.".format(len(TRAIN_DATASET)))
         EVAL_DATASET=TrainCustomDataset.load_data(saveDir+saveEval)
-        print("Total {} samples in evaluation dataset.".format(len(EVAL_DATASET)))
-        timePrint(loadtime)
-        CurrentTime(timezone)
+
+    print("Total {} samples in training dataset.".format(len(TRAIN_DATASET)))
+    print("Total {} samples in evaluation dataset.".format(len(EVAL_DATASET)))
+    timePrint(loadtime)
+    CurrentTime(timezone)
 
     if args.save is True:
         print("Save Dataset")
@@ -392,12 +391,9 @@ if __name__ == '__main__':
     max_index = accuracyChart.index(max_value)
 
     print("Best model = %d"%max_index)
-
-    xpoints = np.array(accuracyChart)
-    ypoints = np.array(accuracyChart.index)
-
-    plt.plot(xpoints, ypoints)
+    plt.plot(accuracyChart)
     plt.show()
+
 
     timePrint(start)
     CurrentTime(timezone)

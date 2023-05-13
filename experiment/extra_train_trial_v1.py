@@ -89,8 +89,6 @@ class TrainCustomDataset(Dataset):
         self.num_extra_features = 0
         self.room_points, self.room_labels = [], []
         self.room_coord_min, self.room_coord_max = [], []
-        adjustedclass = num_classes
-        range_class = num_classes + 1
 
         # For Geometric Features
         self.extra_features = []
@@ -101,6 +99,9 @@ class TrainCustomDataset(Dataset):
         if las_file_list is None:
             self.room_idxs = np.array([])
             return
+
+        adjustedclass = num_classes
+        range_class = num_classes + 1
 
         # Use glob to find all .las files in the data_root directory
         las_files = las_file_list
@@ -352,31 +353,31 @@ def main(args):
             print(dimension.name)
 
     '''Load Dataset'''
+    loadtime = time.time()
+
     if args.load is False:
         lidar_dataset = TrainCustomDataset(las_file_list, num_classes=NUM_CLASSES, num_point=NUM_POINT, transform=None)
         print("Dataset taken")
+
         # Split the dataset into training and evaluation sets
         train_size = int(train_ratio * len(lidar_dataset))
         eval_size = len(lidar_dataset) - train_size
-
-        # Split the full dataset into train and eval sets
         train_indices, eval_indices = random_split(range(len(lidar_dataset)), [train_size, eval_size])
 
         print("start loading training data ...")
         TRAIN_DATASET = lidar_dataset.copy(indices=train_indices)
-        # Evaluation DATASET
-        print("start loading evalaution data ...")
-        EVAL_DATASET = lidar_dataset.copy(indices=eval_indices)
-        timePrint(start)
-        CurrentTime(timezone)
 
+        print("start loading eval data ...")
+        EVAL_DATASET = lidar_dataset.copy(indices=eval_indices)
     else:
         print("Load previously saved dataset")
-        loadtime = time.time()
         TRAIN_DATASET = TrainCustomDataset.load_data(saveDir + saveTrain)
         EVAL_DATASET = TrainCustomDataset.load_data(saveDir + saveEval)
-        timePrint(loadtime)
-        CurrentTime(timezone)
+
+    print("Total {} samples in training dataset.".format(len(TRAIN_DATASET)))
+    print("Total {} samples in evaluation dataset.".format(len(EVAL_DATASET)))
+    timePrint(loadtime)
+    CurrentTime(timezone)
 
     if args.save is True:
         print("Save Dataset")
@@ -473,12 +474,9 @@ if __name__ == '__main__':
     max_index = accuracyChart.index(max_value)
 
     print("Best model = %d"%max_index)
-
-    xpoints = np.array(accuracyChart)
-    ypoints = np.array(accuracyChart.index)
-
-    plt.plot(xpoints, ypoints)
+    plt.plot(accuracyChart)
     plt.show()
+
 
     timePrint(start)
     CurrentTime(timezone)

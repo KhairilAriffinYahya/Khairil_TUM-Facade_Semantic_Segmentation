@@ -25,9 +25,15 @@ CurrentTime(timezone)
 saveTest = "geo_testdata.pkl"
 saveDir = "/content/Khairil_PN2_experiment/experiment/data/saved_data/"
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
 # 0: wall, # 1: window, # 2: door, # 3: molding, # 4: other, # 5: terrain, # 6: column, # 7: arch
 classes = ["wall", "window", "door", "molding", "other", "terrain", "column", "arch"]
 NUM_CLASSES = 8
+
+#classes = ["total", "wall", "window",  "door",  "balcony","molding", "deco", "column", "arch", "drainpipe", "stairs",
+# "ground surface", "terrain",  "roof",  "blinds", "outer ceiling surface", "interior", "other"]
+#NUM_CLASSES = 18
+
 train_ratio = 0.7
 
 ''''''
@@ -58,6 +64,7 @@ def parse_args():
     parser.add_argument('--test_area', type=str, default='cc_o_DEBY_LOD2_4959323.las',
                         help='area for testing, option: 1-6 [default: 5]')
     parser.add_argument('--num_votes', type=int, default=5,
+                        help='aggregate segmentation scores with voting [default: 5]')
     parser.add_argument('--output_model', type=str, default='/best_model.pth', help='model output name')
     parser.add_argument('--rootdir', type=str, default='/content/drive/MyDrive/ data/tum/tum-facade/training/gml_selected/',
                         help='directory to data')
@@ -93,6 +100,7 @@ class TestCustomDataset():
         self.room_coord_min, self.room_coord_max = [], []
         self.labelweights = np.zeros(num_classes)
         self.num_extra_features = 0
+        self.num_classes = num_classes
 
         # For Geometric Features
         self.extra_features = []
@@ -125,7 +133,7 @@ class TestCustomDataset():
             tmp_features=np.zeros(len(args.extra_features))
             ix = 0
             for feature in args.extra_features:
-                tmp_features[ix] = np.array(las_data.feature, dtype=np.float64)
+                tmp_features[ix] = np.array(in_file.feature, dtype=np.float64)
                 ix += 1
             if self.num_extra_features > 0:
                 self.extra_features_data.append(tmp_features)
@@ -205,7 +213,6 @@ class TestCustomDataset():
                     features_points = features_room[ix]
                     selected_feature = features_points[point_idxs]  # num_point * lp_features
                     tmp_features.append(selected_feature)
-                    num_of_features += 1
 
                 tmp_np_features = np.array(tmp_features).reshape(-1, 1)
                 data_batch = np.concatenate((data_batch, tmp_np_features), axis=1)
@@ -234,8 +241,26 @@ class TestCustomDataset():
         filtered_indices = list(total_indices - non_index_set)
         return filtered_indices
 
-    def index_update(self, newIndices):
-        self.semantic_labels_list = newIndices
+    def index_update(self, new_indices):
+        tmp_scene_points_num = []
+        tmp_scene_points_list = [self.scene_points_list[i] for i in new_indices]
+        tmp_semantic_labels_list = [self.semantic_labels_list[i] for i in new_indices]
+
+        self.scene_points_list = tmp_scene_points_list
+        self.semantic_labels_list = tmp_semantic_labels_list
+
+        # Recompute labelweights
+        num_classes = len(self.labelweights)
+        assert num_classes == self.num_classes
+        labelweights = np.zeros(num_classes)
+        for seg in tmp_semantic_labels_list:
+            tmp, _ = np.histogram(seg, range(num_classes + 1))
+            tmp_scene_points_num.append(seg.shape[0])
+            labelweights += tmp
+        labelweights = labelweights.astype(np.float32)
+        labelweights = labelweights / np.sum(labelweights)
+        self.labelweights = np.power(np.amax(labelweights) / labelweights, 1 / 3.0)
+        self.scene_points_num = tmp_scene_points_num
 
     def copy(self, new_indices=None): #Copy target dataset but adjust index if needed
         new_dataset = TestCustomDataset()
@@ -339,13 +364,13 @@ def main(args):
     '''Dataset'''
     testdatatime = time.time()
 
+    print("start loading test data ...")
     if args.load is False:
-        print("start loading test data ...")
         TEST_DATASET_WHOLE_SCENE = TestCustomDataset(root, test_file, num_classes=NUM_CLASSES, block_points=NUM_POINT)
-        log_string("The number of test data is: %d" % len(TEST_DATASET_WHOLE_SCENE))
     else:
         TEST_DATASET_WHOLE_SCENE = TestCustomDataset.load_data(saveDir + saveTest)
 
+    log_string("The number of test data is: %d" % len(TEST_DATASET_WHOLE_SCENE))
     timePrint(testdatatime)
     CurrentTime(timezone)
 
@@ -375,115 +400,13 @@ def main(args):
 
     num_of_features = 6 + num_extra_features
 
+
     '''Model testing'''
     with torch.no_grad():
-        scene_id = TEST_DATASET_WHOLE_SCENE.file_list
-        scene_id = [x[:-4] for x in scene_id]
-        num_batches = len(TEST_DATASET_WHOLE_SCENE)
-
-        total_seen_class = [0 for _ in range(NUM_CLASSES)]
-        total_correct_class = [0 for _ in range(NUM_CLASSES)]
-        total_iou_deno_class = [0 for _ in range(NUM_CLASSES)]
-
-        log_string('---- EVALUATION WHOLE SCENE----')
-
-        for batch_idx in range(num_batches):
-            print("Inference [%d/%d] %s ..." % (batch_idx + 1, num_batches, scene_id[batch_idx]))
-            total_seen_class_tmp = [0 for _ in range(NUM_CLASSES)]
-            total_correct_class_tmp = [0 for _ in range(NUM_CLASSES)]
-            total_iou_deno_class_tmp = [0 for _ in range(NUM_CLASSES)]
-            if args.visual:
-                fout = open(os.path.join(visual_dir, scene_id[batch_idx] + '_pred.obj'), 'w')
-                fout_gt = open(os.path.join(visual_dir, scene_id[batch_idx] + '_gt.obj'), 'w')
-            whole_scene_data = TEST_DATASET_WHOLE_SCENE.scene_points_list[batch_idx]
-            whole_scene_label = TEST_DATASET_WHOLE_SCENE.semantic_labels_list[batch_idx]
-            vote_label_pool = np.zeros((whole_scene_label.shape[0], NUM_CLASSES))
-            for _ in tqdm(range(args.num_votes), total=args.num_votes):
-                scene_data, scene_label, scene_smpw, scene_point_index = TEST_DATASET_WHOLE_SCENE[batch_idx]
-                num_blocks = scene_data.shape[0]
-                s_batch_num = (num_blocks + BATCH_SIZE - 1) // BATCH_SIZE
-                batch_data = np.zeros((BATCH_SIZE, NUM_POINT, num_of_features))  # Change to number of features being used 6+x
-
-                batch_label = np.zeros((BATCH_SIZE, NUM_POINT))
-                batch_point_index = np.zeros((BATCH_SIZE, NUM_POINT))
-                batch_smpw = np.zeros((BATCH_SIZE, NUM_POINT))
-
-                for sbatch in range(s_batch_num):
-                    start_idx = sbatch * BATCH_SIZE
-                    end_idx = min((sbatch + 1) * BATCH_SIZE, num_blocks)
-                    real_batch_size = end_idx - start_idx
-                    batch_data[0:real_batch_size, ...] = scene_data[start_idx:end_idx, ...]
-                    batch_label[0:real_batch_size, ...] = scene_label[start_idx:end_idx, ...]
-                    batch_point_index[0:real_batch_size, ...] = scene_point_index[start_idx:end_idx, ...]
-                    batch_smpw[0:real_batch_size, ...] = scene_smpw[start_idx:end_idx, ...]
-
-                    torch_data = torch.Tensor(batch_data)
-                    torch_data = torch_data.float().cuda()
-                    torch_data = torch_data.transpose(2, 1)
-                    seg_pred, _ = classifier(torch_data)
-                    batch_pred_label = seg_pred.contiguous().cpu().data.max(2)[1].numpy()
-
-                    vote_label_pool = add_vote(vote_label_pool, batch_point_index[0:real_batch_size, ...],
-                                               batch_pred_label[0:real_batch_size, ...],
-                                               batch_smpw[0:real_batch_size, ...])
-
-            pred_label = np.argmax(vote_label_pool, 1)
-
-            for l in range(NUM_CLASSES):
-                total_seen_class_tmp[l] += np.sum((whole_scene_label == l))
-                total_correct_class_tmp[l] += np.sum((pred_label == l) & (whole_scene_label == l))
-                total_iou_deno_class_tmp[l] += np.sum(((pred_label == l) | (whole_scene_label == l)))
-                total_seen_class[l] += total_seen_class_tmp[l]
-                total_correct_class[l] += total_correct_class_tmp[l]
-                total_iou_deno_class[l] += total_iou_deno_class_tmp[l]
-
-            iou_map = np.array(total_correct_class_tmp) / (np.array(total_iou_deno_class_tmp, dtype=float) + 1e-6)
-            print(iou_map)
-            arr = np.array(total_seen_class_tmp)
-            tmp_iou = np.mean(iou_map[arr != 0])
-            log_string('Mean IoU of %s: %.4f' % (scene_id[batch_idx], tmp_iou))
-            print('----------------------------')
-
-            filename = os.path.join(visual_dir, scene_id[batch_idx] + '.txt')
-            with open(filename, 'w') as pl_save:
-                for i in pred_label:
-                    pl_save.write(str(int(i)) + '\n')
-                pl_save.close()
-
-            if args.visual:
-                for i in range(whole_scene_label.shape[0]):
-                    fout.write('v %f %f %f\n' % (
-                        whole_scene_data[i, 0], whole_scene_data[i, 1], whole_scene_data[i, 2]))
-                    fout_gt.write('v %f %f %f\n' % (
-                        whole_scene_data[i, 0], whole_scene_data[i, 1], whole_scene_data[i, 2]))
-
-            if args.visual:
-                fout.close()
-                fout_gt.close()
-
-            CurrentTime(timezone)
-
-        IoU = np.array(total_correct_class) / (np.array(total_iou_deno_class, dtype=float) + 1e-6)
-        iou_per_class_str = '------- IoU --------\n'
-        for l in range(NUM_CLASSES):
-            tmp = float(total_iou_deno_class[l])
-            if tmp == 0:
-                tmp = 0
-            else:
-                tmp = total_correct_class[l] / float(total_iou_deno_class[l])
-            iou_per_class_str += 'class %s, IoU: %.3f \n' % (
-                seg_label_to_cat[l] + ' ' * (14 - len(seg_label_to_cat[l])),tmp )
-
-        # Logging results
-        log_string(iou_per_class_str)
-        log_string('eval point avg class IoU: %f' % np.mean(IoU))
-        log_string('eval whole scene point avg class acc: %f' % (
-            np.mean(np.array(total_correct_class) / (np.array(total_seen_class, dtype=float) + 1e-6))))
-        log_string('eval whole scene point accuracy: %f' % (
-                np.sum(total_correct_class) / float(np.sum(total_seen_class) + 1e-6)))
-
+        print("Begin testing")
+        modelTesting(TEST_DATASET_WHOLE_SCENE, NUM_CLASSES, NUM_POINT, BATCH_SIZE, args, timezone,
+                     num_of_features, log_string, visual_dir, classifier, seg_label_to_cat)
         print("Done!")
-
 
 if __name__ == '__main__':
     args = parse_args()
