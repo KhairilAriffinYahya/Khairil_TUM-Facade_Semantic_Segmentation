@@ -71,8 +71,8 @@ def parse_args():
     parser.add_argument('--load', type=bool, default=False, help='load saved data or new')
     parser.add_argument('--save', type=bool, default=False, help='save data')
     parser.add_argument('--visualizeModel', type=str, default=False, help='directory to data')
-    parser.add_argument('--extra_features', type=list, default=['name1'], help='select which features  to add')
-    
+    parser.add_argument('--extra_features', type=list, default=[], help='select which features  to add')
+
     return parser.parse_args()
 
 
@@ -87,7 +87,7 @@ def add_vote(vote_label_pool, point_idx, pred_label, weight):
 
 class TestCustomDataset():
     # prepare to give prediction on each points
-    def __init__(self, root, las_file_list='trainval_fullarea', num_classes=8, block_points=4096, stride=0.5,
+    def __init__(self, root, las_file_list='trainval_fullarea', feature_list=[], num_classes=8, block_points=4096, stride=0.5,
                  block_size=1.0, padding=0.001):
         self.block_points = block_points
         self.block_size = block_size
@@ -117,7 +117,7 @@ class TestCustomDataset():
 
         new_class_mapping = {1: 0, 2: 1, 3: 2, 6: 3, 13: 4, 11: 5, 7: 6, 8: 7}
 
-        for feature in args.extra_features:
+        for feature in feature_list:
             self.extra_features.append(feature)
             self.num_extra_features += 1
 
@@ -130,14 +130,15 @@ class TestCustomDataset():
             points = np.vstack((in_file.x, in_file.y, in_file.z)).T
             labels = np.array(in_file.classification, dtype=np.int32)
             
-            tmp_features=np.zeros(len(args.extra_features))
-            ix = 0
-            for feature in args.extra_features:
-                tmp_features[ix] = np.array(in_file.feature, dtype=np.float64)
-                ix += 1
+
+            tmp_features = []
+            for feature in feature_list:
+                # Retrieve the variable with the same name as the feature from `las_data`
+                feature_value = getattr(las_data, feature)
+                tmp_features.append(feature_value)
+
             if self.num_extra_features > 0:
                 self.extra_features_data.append(tmp_features)
-            
 
             # Merge labels as per instructions
             labels[(labels == 5) | (labels == 6)] = 6  # Merge molding and decoration
@@ -176,7 +177,6 @@ class TestCustomDataset():
         data_room, label_room, sample_weight, index_room = np.array([]), np.array([]), np.array([]), np.array([])
 
         extra_num = self.num_extra_features
-        extra_names = self.extra_features
 
         for index_y in range(grid_y):
             for index_x in range(grid_x):
@@ -207,8 +207,7 @@ class TestCustomDataset():
                 data_batch = np.concatenate((data_batch, normlized_xyz), axis=1)
 
                 tmp_features = []
-                for ix in  range(extra_names):
-                    f = extra_names[ix]
+                for ix in  range(extra_num):
                     features_room = self.extra_features_data[index] # Load the features
                     features_points = features_room[ix]
                     selected_feature = features_points[point_idxs]  # num_point * lp_features
@@ -335,6 +334,12 @@ def main(args):
     savetest_path = saveDir + saveTest
     test_file = glob.glob(root + args.test_area)
 
+    feature_list = []
+    for feature in args.extra_features:
+        feature_list.append(feature)
+    print("Extra features to be added")
+    print(feature_list)
+
     '''HYPER PARAMETER'''
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
     if args.exp_dir is None:
@@ -366,7 +371,7 @@ def main(args):
 
     print("start loading test data ...")
     if args.load is False:
-        TEST_DATASET_WHOLE_SCENE = TestCustomDataset(root, test_file, num_classes=NUM_CLASSES, block_points=NUM_POINT)
+        TEST_DATASET_WHOLE_SCENE = TestCustomDataset(root, test_file, feature_list, num_classes=NUM_CLASSES, block_points=NUM_POINT)
     else:
         TEST_DATASET_WHOLE_SCENE = TestCustomDataset.load_data(saveDir + saveTest)
 

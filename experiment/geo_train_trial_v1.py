@@ -230,13 +230,13 @@ class TrainCustomDataset(Dataset):
             num_of_features += 1
 
 
-        tmp_features = np.zeros((self.num_point, num_of_features))
-        tmp_features[:, 0:current_points.shape[1]] = current_features
+        tmp_np_features = np.zeros((self.num_point, num_of_features))
+        tmp_np_features[:, 0:current_points.shape[1]] = current_features
         features_loop = num_of_features - current_points.shape[1]
         for i in range(features_loop):
             col_pointer = i + current_points.shape[1]
-            tmp_features[:, col_pointer] = geo_features[i]
-        current_features = tmp_features
+            tmp_np_features[:, col_pointer] = geo_features[i]
+        current_features = tmp_np_features
 
         current_labels = labels[selected_point_idxs]
         if self.transform is not None:

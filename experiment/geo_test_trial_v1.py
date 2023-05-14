@@ -208,6 +208,7 @@ class TestCustomDataset():
                     lc_room = self.lc_data[index]
                     selected_lc = lc_room[point_idxs]  # num_point * lc_features
                     geo_features.append(selected_lc)
+
                 tmp_features = np.array(geo_features).reshape(-1, 1)
                 data_batch = np.concatenate((data_batch, tmp_features), axis=1)
 
