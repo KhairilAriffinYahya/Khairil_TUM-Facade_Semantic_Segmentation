@@ -304,6 +304,7 @@ def main(args):
     NUM_POINT = args.npoint
     BATCH_SIZE = args.batch_size
     las_file_list = [file for file in glob.glob(root + '/*.las') if not file.endswith(args.test_area)]
+    print("Number of Classes = %d" %NUM_CLASSES)
 
     feature_list = []
     for feature in args.extra_features:

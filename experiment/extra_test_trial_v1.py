@@ -76,15 +76,6 @@ def parse_args():
     return parser.parse_args()
 
 
-def add_vote(vote_label_pool, point_idx, pred_label, weight):
-    B = pred_label.shape[0]
-    N = pred_label.shape[1]
-    for b in range(B):
-        for n in range(N):
-            if weight[b, n] != 0 and not np.isinf(weight[b, n]):
-                vote_label_pool[int(point_idx[b, n]), int(pred_label[b, n])] += 1
-    return vote_label_pool
-
 class TestCustomDataset():
     # prepare to give prediction on each points
     def __init__(self, root, las_file_list='trainval_fullarea', feature_list=[], num_classes=8, block_points=4096, stride=0.5,
@@ -333,6 +324,7 @@ def main(args):
     NUM_POINT = args.num_point
     savetest_path = saveDir + saveTest
     test_file = glob.glob(root + args.test_area)
+    print("Number of Classes = %d" %NUM_CLASSES)
 
     feature_list = []
     for feature in args.extra_features:

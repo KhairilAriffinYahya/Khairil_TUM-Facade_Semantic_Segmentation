@@ -240,6 +240,7 @@ def main(args):
     savetrain_path = saveDir+saveTrain
     saveeval_path = saveDir+saveEval
     las_file_list = [file for file in glob.glob(root + '/*.las') if not file.endswith(args.test_area )]
+    print("Number of Classes = %d" %NUM_CLASSES)
 
 
     '''HYPER PARAMETER'''

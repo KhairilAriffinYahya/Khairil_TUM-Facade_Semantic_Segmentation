@@ -331,6 +331,7 @@ def main(args):
     NUM_POINT = args.num_point
     savetest_path = saveDir + saveTest
     test_file = glob.glob(root + args.test_area)
+    print("Number of Classes = %d" %NUM_CLASSES)
 
     '''HYPER PARAMETER'''
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
