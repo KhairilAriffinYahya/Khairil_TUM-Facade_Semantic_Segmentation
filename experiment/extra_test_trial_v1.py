@@ -408,8 +408,8 @@ def main(args):
 
 if __name__ == '__main__':
     args = parse_args()
-    main(args)
     start = time.time()
+    main(args)
 
     timePrint(start)
     CurrentTime(timezone)
