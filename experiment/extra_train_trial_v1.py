@@ -64,11 +64,11 @@ def parse_args():
     parser.add_argument('--npoint', type=int, default=4096, help='Point Number [default: 4096]')
     parser.add_argument('--step_size', type=int, default=10, help='Decay step for lr decay [default: every 10 epochs]')
     parser.add_argument('--lr_decay', type=float, default=0.7, help='Decay rate for lr decay [default: 0.7]')
-    parser.add_argument('--test_area', type=str, default='cc_o_clipped_DEBY_LOD2_4959323.las',
+    parser.add_argument('--test_area', type=str, default='cc_o_clipped_Local_DEBY_LOD2_4959323.las',
                         help='Which area to use for test, option: 1-6 [default: 5]')
     parser.add_argument('--output_model', type=str, default='/best_model.pth', help='model output name')
     parser.add_argument('--rootdir', type=str,
-                        default='/content/drive/MyDrive/ data/tum/tum-facade/training/cc_global/FME',
+                        default='/content/drive/MyDrive/ data/tum/tum-facade/training/cc_selected/FME',
                         help='directory to data')
     parser.add_argument('--load', type=bool, default=False, help='load saved data or new')
     parser.add_argument('--save', type=bool, default=False, help='save data')

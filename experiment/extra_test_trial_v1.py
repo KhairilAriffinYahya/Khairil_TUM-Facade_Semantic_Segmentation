@@ -61,12 +61,13 @@ def parse_args():
     parser.add_argument('--log_dir', type=str, default='pointnet2_sem_seg', help='log directory')
     parser.add_argument('--exp_dir', type=str, default='log/sem_seg/', help='Log path [default: None]')
     parser.add_argument('--visual', action='store_true', default=False, help='visualize result [default: False]')
-    parser.add_argument('--test_area', type=str, default='cc_o_DEBY_LOD2_4959323.las',
-                        help='area for testing, option: 1-6 [default: 5]')
     parser.add_argument('--num_votes', type=int, default=5,
                         help='aggregate segmentation scores with voting [default: 5]')
     parser.add_argument('--output_model', type=str, default='/best_model.pth', help='model output name')
-    parser.add_argument('--rootdir', type=str, default='/content/drive/MyDrive/ data/tum/tum-facade/training/gml_selected/',
+    parser.add_argument('--test_area', type=str, default='cc_o_clipped_Local_DEBY_LOD2_4959323.las',
+                        help='Which area to use for test, option: 1-6 [default: 5]')
+    parser.add_argument('--rootdir', type=str,
+                        default='/content/drive/MyDrive/ data/tum/tum-facade/training/cc_selected/FME',
                         help='directory to data')
     parser.add_argument('--load', type=bool, default=False, help='load saved data or new')
     parser.add_argument('--save', type=bool, default=False, help='save data')
