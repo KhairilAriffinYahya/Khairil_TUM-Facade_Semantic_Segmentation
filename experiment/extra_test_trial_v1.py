@@ -64,10 +64,10 @@ def parse_args():
     parser.add_argument('--num_votes', type=int, default=5,
                         help='aggregate segmentation scores with voting [default: 5]')
     parser.add_argument('--output_model', type=str, default='/best_model.pth', help='model output name')
-    parser.add_argument('--test_area', type=str, default='cc_o_clipped_Local_DEBY_LOD2_4959323.las',
+    parser.add_argument('--test_area', type=str, default="cc_o_clipped_Local_DEBY_LOD2_4959323_cc.las",
                         help='Which area to use for test, option: 1-6 [default: 5]')
     parser.add_argument('--rootdir', type=str,
-                        default='/content/drive/MyDrive/ data/tum/tum-facade/training/cc_selected/FME',
+                        default="/content/drive/MyDrive/ data/tum/tum-facade/training/cc_selected/CC/",
                         help='directory to data')
     parser.add_argument('--load', type=bool, default=False, help='load saved data or new')
     parser.add_argument('--save', type=bool, default=False, help='save data')
