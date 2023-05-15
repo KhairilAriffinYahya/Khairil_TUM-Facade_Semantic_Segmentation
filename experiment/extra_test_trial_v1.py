@@ -72,7 +72,7 @@ def parse_args():
     parser.add_argument('--load', type=bool, default=False, help='load saved data or new')
     parser.add_argument('--save', type=bool, default=False, help='save data')
     parser.add_argument('--visualizeModel', type=str, default=False, help='directory to data')
-    parser.add_argument('--extra_features', type=list, default=[], help='select which features  to add')
+    parser.add_argument('--extra_features', nargs='+', default=[], help='select which features  to add')
 
     return parser.parse_args()
 
@@ -126,7 +126,7 @@ class TestCustomDataset():
             tmp_features = []
             for feature in feature_list:
                 # Retrieve the variable with the same name as the feature from `las_data`
-                feature_value = getattr(las_data, feature)
+                feature_value = getattr(in_file, feature)
                 tmp_features.append(feature_value)
 
             if self.num_extra_features > 0:
