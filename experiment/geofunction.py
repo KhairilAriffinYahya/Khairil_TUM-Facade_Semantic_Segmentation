@@ -126,7 +126,7 @@ def createPCD(dataset):
 
     return pcd, all_points, all_labels
 
-def cal_geofeature(dataset, dwnsample, visualize):
+def add_geofeature(dataset, dwnsample, visualize):
     # Open3D
     pcd, points, labels = createPCD(dataset)
 
@@ -161,3 +161,31 @@ def cal_geofeature(dataset, dwnsample, visualize):
     if len(non_index) != 0:
         filtered_indices = dataset.filtered_indices()
         dataset.filtered_update(filtered_indices)
+
+
+def cal_geofeature(dataset, dwnsample, visualize):
+    # Open3D
+    pcd, points, labels = createPCD(dataset)
+
+    # Downsampling
+    if dwnsample is True:
+        pcd, points, labels, dataset = downsamplingPCD(pcd, dataset)
+        print("downsampled room_idx")
+        print(len(dataset))
+
+    # Visualization
+    if  visualize is True:
+        colors = plt.get_cmap("tab20")(np.array(labels).reshape(-1) / 17.0)
+        colors = colors[:, 0:3]
+        pcd.colors = o3d.utility.Vector3dVector(colors)
+        o3d.visualization.draw_geometries([pcd], window_name='test the color', width=800, height=600)
+
+    # Geometric Feature Addition
+    # add features, normals, lambda, p, o, c, radius is 0.8m
+    dataset_total_len = len(dataset)
+    eigenNorm, llambda, lp, lo, lc, non_index = collFeatures(pcd, dataset_total_len)
+
+    print("eigenvector len = %" % len(eigenNorm))
+    print("non-index = %" % len(non_index))
+
+    return lp, lo, lc, non_index

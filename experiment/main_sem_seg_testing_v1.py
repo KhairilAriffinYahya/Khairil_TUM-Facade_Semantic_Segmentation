@@ -7,16 +7,15 @@ import importlib
 import laspy
 import glob
 import numpy as np
-import open3d as o3d
-import pickle
-import h5py
 import pytz
+import pickle
+import open3d as o3d
+import h5py
 import matplotlib.pyplot as plt
 import time
-from geofunction import cal_geofeature
 from models.localfunctions import timePrint, CurrentTime, modelTesting
-from tqdm import tqdm
 from pathlib import Path
+from tqdm import tqdm
 
 '''Adjust permanent/file/static variables here'''
 
@@ -26,9 +25,15 @@ CurrentTime(timezone)
 saveTest = "geo_testdata.pkl"
 saveDir = "/content/Khairil_PN2_experiment/experiment/data/saved_data/"
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
 # 0: wall, # 1: window, # 2: door, # 3: molding, # 4: other, # 5: terrain, # 6: column, # 7: arch
 classes = ["wall", "window", "door", "molding", "other", "terrain", "column", "arch"]
 NUM_CLASSES = 8
+
+#classes = ["total", "wall", "window",  "door",  "balcony","molding", "deco", "column", "arch", "drainpipe", "stairs",
+# "ground surface", "terrain",  "roof",  "blinds", "outer ceiling surface", "interior", "other"]
+#NUM_CLASSES = 18
+
 train_ratio = 0.7
 dataColor = True #if data lack color set this to False
 
@@ -49,34 +54,35 @@ print(seg_label_to_cat)
 def parse_args():
     '''PARAMETERS'''
     parser = argparse.ArgumentParser('Model')
+    parser.add_argument('--model', type=str, default='pointnet2_sem_seg_extra_feature_trial',
+                        help='model name [default: pointnet_sem_seg]')
     parser.add_argument('--batch_size', type=int, default=32, help='batch size in testing [default: 32]')
     parser.add_argument('--gpu', type=str, default='0', help='specify gpu device')
     parser.add_argument('--num_point', type=int, default=4096, help='point number [default: 4096]')
     parser.add_argument('--log_dir', type=str, default='pointnet2_sem_seg', help='log directory')
     parser.add_argument('--exp_dir', type=str, default='log/sem_seg/', help='Log path [default: None]')
     parser.add_argument('--visual', action='store_true', default=False, help='visualize result [default: False]')
-    parser.add_argument('--test_area', type=str, default='cc_o_DEBY_LOD2_4959323.las',
-                        help='area for testing, option: 1-6 [default: 5]')
     parser.add_argument('--num_votes', type=int, default=5,
                         help='aggregate segmentation scores with voting [default: 5]')
-    parser.add_argument('--model', type=str, default='pointnet2_sem_seg_extra_feature_trial',
-                        help='model name [default: pointnet_sem_seg]')
     parser.add_argument('--output_model', type=str, default='/best_model.pth', help='model output name')
-    parser.add_argument('--rootdir', type=str, default='/content/drive/MyDrive/ data/tum/tum-facade/training/cc_selected/',
+    parser.add_argument('--test_area', type=str, default="cc_o_clipped_Local_DEBY_LOD2_4959323_cc.las",
+                        help='Which area to use for test, option: 1-6 [default: 5]')
+    parser.add_argument('--rootdir', type=str,
+                        default="/content/drive/MyDrive/ data/tum/tum-facade/training/cc_selected/CC/",
                         help='directory to data')
     parser.add_argument('--load', type=bool, default=False, help='load saved data or new')
     parser.add_argument('--save', type=bool, default=False, help='save data')
     parser.add_argument('--visualizeModel', type=str, default=False, help='directory to data')
+    parser.add_argument('--extra_features', nargs='+', default=[], help='select which features  to add')
     parser.add_argument('--downsample', type=bool, default=False, help='downsample data')
     parser.add_argument('--calculate_geometry', type=bool, default=False, help='decide where to calculate geometry')
-    parser.add_argument('--geometry_features', type=list, default=['p', 'o', 'c'],
-                        help='select which geometry_features to add')
 
     return parser.parse_args()
 
+
 class TestCustomDataset():
     # prepare to give prediction on each points
-    def __init__(self, root, las_file_list='trainval_fullarea', num_classes=8, block_points=4096, stride=0.5,
+    def __init__(self, root, las_file_list='trainval_fullarea', feature_list=[], num_classes=8, block_points=4096, stride=0.5,
                  block_size=1.0, padding=0.001):
         self.block_points = block_points
         self.block_size = block_size
@@ -88,14 +94,11 @@ class TestCustomDataset():
         self.semantic_labels_list = []
         self.room_coord_min, self.room_coord_max = [], []
         self.labelweights = np.zeros(num_classes)
-        self.num_classes = num_classes
         self.num_extra_features = 0
+        self.num_classes = num_classes
+
+        # For Extra Features
         self.extra_features_data = []
-        
-        # For Geometric Features
-        self.lp_data = []
-        self.lo_data = []
-        self.lc_data = []
         self.non_index = []
 
         # Return early if las_file_list is None
@@ -108,18 +111,14 @@ class TestCustomDataset():
 
         new_class_mapping = {1: 0, 2: 1, 3: 2, 6: 3, 13: 4, 11: 5, 7: 6, 8: 7}
 
-        feature_list=[]
-        if dataColor is True:
-          feature_list=['red','blue','green']
-          for feature in feature_list:
-              self.num_extra_features += 1
+        if dataColor is True:        
+            feature_list.append("red")
+            feature_list.append("blue")
+            feature_list.append("green")
+            
+        for feature in feature_list:
+            self.num_extra_features += 1
 
-        if 'p' in args.geometry_features:
-            self.num_extra_features += 1
-        if 'o' in args.geometry_features:
-            self.num_extra_features += 1
-        if 'c' in args.geometry_features:
-            self.num_extra_features += 1
 
         for files in self.file_list:
             file_path = os.path.join(root, files)
@@ -128,25 +127,15 @@ class TestCustomDataset():
             in_file = laspy.read(file_path)
             points = np.vstack((in_file.x, in_file.y, in_file.z)).T
             labels = np.array(in_file.classification, dtype=np.int32)
-            if args.calculate_geometry is False:
-                if 'p' in args.geometry_features:
-                    tmp_p = np.array(in_file.planarity, dtype=np.float64)
-                    self.lp_data.append(tmp_p)
-                if 'o' in args.geometry_features:
-                    tmp_o = np.array(in_file.Omnivariance, dtype=np.float64)
-                    self.lo_data.append(tmp_o)
-                if 'c' in args.geometry_features:
-                    tmp_c = np.array(in_file.surface_variation, dtype=np.float64)
-                    self.lc_data.append(tmp_c)
-                    
-            # Retrieve color points
+            
+
             tmp_features = []
             for feature in feature_list:
                 # Retrieve the variable with the same name as the feature from `las_data`
-                feature_value = getattr(las_data, feature)
+                feature_value = getattr(in_file, feature)
                 tmp_features.append(feature_value)
 
-            if len(feature_list) > 0:
+            if self.num_extra_features > 0:
                 self.extra_features_data.append(tmp_features)
 
             # Merge labels as per instructions
@@ -160,13 +149,16 @@ class TestCustomDataset():
             # Map merged labels to new labels (0 to 7)
             labels = np.vectorize(new_class_mapping.get)(labels)
 
+            #Compile the data extracted
             data = np.hstack((points, labels.reshape((-1, 1))))
             self.scene_points_list.append(data[:, :3])
             self.semantic_labels_list.append(data[:, 3])
             coord_min, coord_max = np.amin(points, axis=0)[:3], np.amax(points, axis=0)[:3]
             self.room_coord_min.append(coord_min), self.room_coord_max.append(coord_max)
+            
         assert len(self.scene_points_list) == len(self.semantic_labels_list)
-
+        assert self.num_extra_features == len(self.extra_features_data)
+        
         labelweights = np.zeros(num_classes)
         for seg in self.semantic_labels_list:
             tmp, _ = np.histogram(seg, range(range_class))
@@ -185,8 +177,7 @@ class TestCustomDataset():
         grid_y = int(np.ceil(float(coord_max[1] - coord_min[1] - self.block_size) / self.stride) + 1)
         data_room, label_room, sample_weight, index_room = np.array([]), np.array([]), np.array([]), np.array([])
 
-
-        extra_num = len(self.extra_features_data)
+        extra_num = self.num_extra_features
 
         for index_y in range(grid_y):
             for index_x in range(grid_x):
@@ -218,24 +209,7 @@ class TestCustomDataset():
                 label_batch = labels[point_idxs].astype(int)
                 batch_weight = self.labelweights[label_batch]
                 
-                #Extra features to be included
-                
-                geo_features = []
-                if 'p' in args.geometry_features:  # Load the lp features
-                    lp_room = self.lp_data[index]
-                    selected_lp = lp_room[point_idxs]  # num_point * lp_features
-                    geo_features.append(selected_lp)
-                if 'o' in args.geometry_features:  # Load the lo features
-                    lo_room = self.lo_data[index]
-                    selected_lo = lo_room[point_idxs]  # num_point * lo_features
-                    geo_features.append(selected_lo)
-                if 'c' in args.geometry_features:  # Load the lc features
-                    lc_room = self.lc_data[index]
-                    selected_lc = lc_room[point_idxs]  # num_point * lc_features
-                    geo_features.append(selected_lc)
-                tmp_geo_features = np.array(geo_features).reshape(-1, 1)
-
-
+                # Extra Feature to be included
                 tmp_features = []
                 for ix in  range(extra_num):
                     features_room = self.extra_features_data[index] # Load the features
@@ -244,9 +218,9 @@ class TestCustomDataset():
                     tmp_features.append(selected_feature)
                 tmp_np_features = np.array(tmp_features).reshape(-1, 1)
                 
-                data_batch = np.concatenate((data_batch, tmp_np_features,tmp_geo_features), axis=1)
-
-                #Compile the data extracted
+                data_batch = np.concatenate((data_batch, tmp_np_features), axis=1)
+                
+                #Compile extracted data
                 data_room = np.vstack([data_room, data_batch]) if data_room.size else data_batch
                 label_room = np.hstack([label_room, label_batch]) if label_room.size else label_batch
                 sample_weight = np.hstack([sample_weight, batch_weight]) if label_room.size else batch_weight
@@ -289,8 +263,7 @@ class TestCustomDataset():
         self.labelweights = np.power(np.amax(labelweights) / labelweights, 1 / 3.0)
         self.scene_points_num = tmp_scene_points_num
 
-
-    def copy(self, new_indices=None):
+    def copy(self, new_indices=None): #Copy target dataset but adjust index if needed
         new_dataset = TestCustomDataset()
         new_dataset.block_points = self.block_points
         new_dataset.block_size = self.block_size
@@ -300,9 +273,6 @@ class TestCustomDataset():
         new_dataset.num_classes = self.num_classes
         new_dataset.room_coord_min = self.room_coord_min
         new_dataset.room_coord_max = self.room_coord_max
-        new_dataset.lp_data = self.lp_data
-        new_dataset.lo_data = self.lo_data
-        new_dataset.lc_data = self.lc_data
         new_dataset.non_index = self.non_index
         new_dataset.num_extra_features = self.num_extra_features
         new_dataset.extra_features_data = self.extra_features_data
@@ -366,6 +336,12 @@ def main(args):
     test_file = glob.glob(root + args.test_area)
     print("Number of Classes = %d" %NUM_CLASSES)
 
+    feature_list = []
+    for feature in args.extra_features:
+        feature_list.append(feature)
+    print("Extra features to be added")
+    print(feature_list)
+
     '''HYPER PARAMETER'''
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
     if args.exp_dir is None:
@@ -397,12 +373,40 @@ def main(args):
 
     print("start loading test data ...")
     if args.load is False:
-        TEST_DATASET_WHOLE_SCENE = TestCustomDataset(root, test_file, num_classes=NUM_CLASSES, block_points=NUM_POINT)
+        tmp_feature_list = feature_list
+        
+        if args.calculate_geometry is True:
+            if 'Planarity' in feature_list:
+                tmp_feature_list.remove('Planarity')
+            if 'Omnivariance' in feature_list:
+                tmp_feature_list.remove('Omnivariance')
+            if 'Surface variation' in feature_list:
+                tmp_feature_list.remove('Surface variation')
+                
+        TEST_DATASET_WHOLE_SCENE = TestCustomDataset(root, test_file, tmp_feature_list, num_classes=NUM_CLASSES, block_points=NUM_POINT)
 
         if args.calculate_geometry is True:
             print("room_idx test")
             print(len(TEST_DATASET_WHOLE_SCENE))
-            add_geofeature(TEST_DATASET_WHOLE_SCENE, args.downsample, args.visualizeModel)
+            lp, lo, lc, non_index = cal_geofeature(TEST_DATASET_WHOLE_SCENE, args.downsample, args.visualizeModel)
+
+            # Store the additional features in the CustomDataset instance
+            if 'Planarity' in feature_list:
+                TEST_DATASET_WHOLE_SCENE.extra_features_data.append(lp)
+                TEST_DATASET_WHOLE_SCENE.num_extra_features+=1
+            if 'Omnivariance' in feature_list:
+                TEST_DATASET_WHOLE_SCENE.extra_features_data.append(lo)
+                TEST_DATASET_WHOLE_SCENE.num_extra_features+=1
+            if 'Surface variation' in feature_list:
+                TEST_DATASET_WHOLE_SCENE.extra_features_data.append(lc)
+                TEST_DATASET_WHOLE_SCENE.num_extra_features+=1
+            
+            TEST_DATASET_WHOLE_SCENE.non_index = non_index
+            # Filter the points and labels using the non_index variable
+            if len(non_index) != 0:
+                filtered_indices = TEST_DATASET_WHOLE_SCENE.filtered_indices()
+                TEST_DATASET_WHOLE_SCENE.filtered_update(filtered_indices)            
+           
             print("geometric room_idx test")
             print(len(TEST_DATASET_WHOLE_SCENE))
     else:
@@ -429,12 +433,15 @@ def main(args):
     print(model_dir)
     MODEL = importlib.import_module(model_dir)
     num_extra_features = TEST_DATASET_WHOLE_SCENE.num_extra_features
-    classifier = MODEL.get_model(NUM_CLASSES, num_extra_features).cuda()
+    print("number = %d" % num_extra_features)
+
+    classifier = MODEL.get_model(NUM_CLASSES, num_extra_features).cuda()  # name sensitive but not case sensitive
     checkpoint = torch.load(str(experiment_dir) + '/checkpoints' + model_name)
     classifier.load_state_dict(checkpoint['model_state_dict'])
     classifier = classifier.eval()
 
     num_of_features = 6 + num_extra_features
+
 
     '''Model testing'''
     with torch.no_grad():
@@ -442,7 +449,6 @@ def main(args):
         modelTesting(TEST_DATASET_WHOLE_SCENE, NUM_CLASSES, NUM_POINT, BATCH_SIZE, args, timezone,
                      num_of_features, log_string, visual_dir, classifier, seg_label_to_cat)
         print("Done!")
-
 
 if __name__ == '__main__':
     args = parse_args()
