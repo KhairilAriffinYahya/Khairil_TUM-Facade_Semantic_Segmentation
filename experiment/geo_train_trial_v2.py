@@ -201,7 +201,7 @@ class TrainCustomDataset(Dataset):
         labels = self.room_labels[room_idx]  # N
         N_points = points.shape[0]
 
-        extra_num = len(self.extra_features_data)
+        extra_num = self.num_extra_features
 
         while (True):
             center = points[np.random.choice(N_points)][:3]
@@ -240,16 +240,19 @@ class TrainCustomDataset(Dataset):
             selected_lp = lp_room[selected_point_idxs]  # num_point * lp_features
             ex_features.append(selected_lp)
             num_of_features += 1
+            extra_num -=1
         if 'o' in args.geometry_features:
             lo_room = self.lo_data[room_idx]
             selected_lo = lo_room[selected_point_idxs]  # num_point * lo_features
             ex_features.append(selected_lo)
             num_of_features += 1
+            extra_num -=1
         if 'c' in args.geometry_features:
             lc_room = self.lc_data[room_idx]
             selected_lc = lc_room[selected_point_idxs]  # num_point * lc_features
             ex_features.append(selected_lc)
             num_of_features += 1
+            extra_num -=1
 
         for ix in range(extra_num):
             features_room = self.extra_features_data[room_idx]

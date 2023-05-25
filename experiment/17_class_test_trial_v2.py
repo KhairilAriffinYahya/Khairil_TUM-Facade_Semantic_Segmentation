@@ -138,8 +138,7 @@ class TestCustomDataset():
         data_room, label_room, sample_weight, index_room = np.array([]), np.array([]), np.array([]),  np.array([])
         
         
-
-        extra_num = len(self.extra_features_data)
+        extra_num = self.num_extra_features
         
         for index_y in range(grid_y):
             for index_x in range(grid_x):

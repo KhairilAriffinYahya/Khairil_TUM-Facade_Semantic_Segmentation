@@ -186,7 +186,7 @@ class TestCustomDataset():
         data_room, label_room, sample_weight, index_room = np.array([]), np.array([]), np.array([]), np.array([])
 
 
-        extra_num = len(self.extra_features_data)
+        extra_num = self.num_extra_features
 
         for index_y in range(grid_y):
             for index_x in range(grid_x):
@@ -225,14 +225,17 @@ class TestCustomDataset():
                     lp_room = self.lp_data[index]
                     selected_lp = lp_room[point_idxs]  # num_point * lp_features
                     geo_features.append(selected_lp)
+                    extra_num -=1
                 if 'o' in args.geometry_features:  # Load the lo features
                     lo_room = self.lo_data[index]
                     selected_lo = lo_room[point_idxs]  # num_point * lo_features
                     geo_features.append(selected_lo)
+                    extra_num -=1
                 if 'c' in args.geometry_features:  # Load the lc features
                     lc_room = self.lc_data[index]
                     selected_lc = lc_room[point_idxs]  # num_point * lc_features
                     geo_features.append(selected_lc)
+                    extra_num -=1
                 tmp_geo_features = np.array(geo_features).reshape(-1, 1)
 
 

@@ -174,7 +174,6 @@ class TrainCustomDataset(Dataset):
         if indices is not None:
             self.room_idxs = self.room_idxs[indices]
 
-        assert self.num_extra_features == len(self.extra_features_data)
 
         print("Extra features to be included = %d" % self.num_extra_features)
         print("Totally {} samples in dataset.".format(len(self.room_idxs)))
@@ -403,7 +402,7 @@ def main(args):
                 tmp_feature_list.remove('Surface variation')
 
         lidar_dataset = TrainCustomDataset(las_file_list, tmp_feature_list, num_classes=NUM_CLASSES, num_point=NUM_POINT,
-                                           transform=None)
+                                           transform=None, class8=args.class8))
         print("Dataset taken")
 
         # Split the dataset into training and evaluation sets
@@ -567,7 +566,7 @@ def main(args):
     accuracyChart = modelTraining(start_epoch, args.epoch, args.learning_rate, args.lr_decay, args.step_size,
                                   BATCH_SIZE, NUM_POINT, NUM_CLASSES, trainDataLoader, evalDataLoader, classifier,
                                   optimizer, criterion, train_weights, checkpoints_dir, model_name, seg_label_to_cat,
-                                  logger, args.class8)
+                                  logger)
 
     return accuracyChart
 

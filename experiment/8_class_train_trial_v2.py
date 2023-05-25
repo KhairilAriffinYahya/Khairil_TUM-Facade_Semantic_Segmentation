@@ -152,9 +152,7 @@ class TrainCustomDataset(Dataset):
         labels = self.room_labels[room_idx]   # N
         N_points = points.shape[0]
 
-
-
-        extra_num = len(self.extra_features_data)
+        extra_num = self.num_extra_features
 
         while (True):
             center = points[np.random.choice(N_points)][:3]

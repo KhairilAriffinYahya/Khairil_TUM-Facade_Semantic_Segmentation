@@ -75,7 +75,7 @@ def parse_args():
 class TestCustomDataset():
     # prepare to give prediction on each points
     def __init__(self, root, las_file_list='trainval_fullarea', feature_list=[], num_classes=8, block_points=4096, stride=0.5,
-                 block_size=1.0, padding=0.001):
+                 block_size=1.0, padding=0.001, class8 = True):
         self.block_points = block_points
         self.block_size = block_size
         self.padding = padding
@@ -130,16 +130,19 @@ class TestCustomDataset():
             if self.num_extra_features > 0:
                 self.extra_features_data.append(tmp_features)
 
-            # Merge labels as per instructions
-            labels[(labels == 5) | (labels == 6)] = 6  # Merge molding and decoration
-            labels[(labels == 1) | (labels == 9) | (labels == 15) | (
-                    labels == 10)] = 1  # Merge wall, drainpipe, outer ceiling surface, and stairs
-            labels[(labels == 12) | (labels == 11)] = 11  # Merge terrain and ground surface
-            labels[(labels == 13) | (labels == 16) | (labels == 17)] = 13  # Merge interior, roof, and other
-            labels[labels == 14] = 2  # Add blinds to window
+            # Reduce number of labels
+            if class8 is True:
+                # Merge labels as per instructions
+                labels[(labels == 5) | (labels == 6)] = 6  # Merge molding and decoration
+                labels[(labels == 1) | (labels == 9) | (labels == 15) | (
+                        labels == 10)] = 1  # Merge wall, drainpipe, outer ceiling surface, and stairs
+                labels[(labels == 12) | (labels == 11)] = 11  # Merge terrain and ground surface
+                labels[(labels == 13) | (labels == 16) | (labels == 17)] = 13  # Merge interior, roof, and other
+                labels[labels == 14] = 2  # Add blinds to window
 
-            # Map merged labels to new labels (0 to 7)
-            labels = np.vectorize(new_class_mapping.get)(labels)
+                # Map merged labels to new labels (0 to 7)
+                labels = np.vectorize(new_class_mapping.get)(labels)
+
 
             #Compile the data extracted
             data = np.hstack((points, labels.reshape((-1, 1))))
@@ -149,7 +152,6 @@ class TestCustomDataset():
             self.room_coord_min.append(coord_min), self.room_coord_max.append(coord_max)
             
         assert len(self.scene_points_list) == len(self.semantic_labels_list)
-        assert self.num_extra_features == len(self.extra_features_data)
         
         labelweights = np.zeros(num_classes)
         for seg in self.semantic_labels_list:
@@ -394,7 +396,7 @@ def main(args):
             if 'Surface variation' in feature_list:
                 tmp_feature_list.remove('Surface variation')
                 
-        TEST_DATASET_WHOLE_SCENE = TestCustomDataset(root, test_file, tmp_feature_list, num_classes=NUM_CLASSES, block_points=NUM_POINT)
+        TEST_DATASET_WHOLE_SCENE = TestCustomDataset(root, test_file, tmp_feature_list, num_classes=NUM_CLASSES, block_points=NUM_POINT, class8=args.class8))
 
         if args.calculate_geometry is True:
             print("room_idx test")
