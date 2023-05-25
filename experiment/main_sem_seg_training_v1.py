@@ -336,8 +336,11 @@ def main(args):
     feature_list = []
     for feature in args.extra_features:
         feature_list.append(feature)
-    print("Extra features to be added")
-    print(feature_list)
+    if len(feature_list) > 0:
+        print("Extra features to be added")
+        print(feature_list)
+    else:
+        print("No extra features")
 
     '''HYPER PARAMETER'''
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
