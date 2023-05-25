@@ -16,6 +16,7 @@ import time
 from models.localfunctions import timePrint, CurrentTime, modelTesting
 from pathlib import Path
 from tqdm import tqdm
+from geofunction import cal_geofeature
 
 '''Adjust permanent/file/static variables here'''
 
@@ -26,28 +27,17 @@ saveTest = "geo_testdata.pkl"
 saveDir = "/content/Khairil_PN2_experiment/experiment/data/saved_data/"
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-# 0: wall, # 1: window, # 2: door, # 3: molding, # 4: other, # 5: terrain, # 6: column, # 7: arch
-classes = ["wall", "window", "door", "molding", "other", "terrain", "column", "arch"]
-NUM_CLASSES = 8
-
-#classes = ["total", "wall", "window",  "door",  "balcony","molding", "deco", "column", "arch", "drainpipe", "stairs",
-# "ground surface", "terrain",  "roof",  "blinds", "outer ceiling surface", "interior", "other"]
-#NUM_CLASSES = 18
-
 train_ratio = 0.7
 dataColor = True #if data lack color set this to False
 
-''''''
 
-sys.path.append(os.path.join(BASE_DIR, 'models'))
-class2label = {cls: i for i, cls in enumerate(classes)}
-seg_classes = class2label
-seg_label_to_cat = {}
-for i, cat in enumerate(seg_classes.keys()):
-    seg_label_to_cat[i] = cat
+classes_18 = ["total", "wall", "window",  "door",  "balcony","molding", "deco", "column", "arch", "drainpipe", "stairs",
+           "ground surface", "terrain",  "roof",  "blinds", "outer ceiling surface", "interior", "other"]
+NUM_CLASSES_18 = 18
 
-print(seg_label_to_cat)
-
+# 0: wall, # 1: window, # 2: door, # 3: molding, # 4: other, # 5: terrain, # 6: column, # 7: arch
+classes_8 = ["wall", "window", "door", "molding", "other", "terrain", "column", "arch"]
+NUM_CLASSES_8 = 8
 
 # Adjust parameters here if there no changes to reduce line
 
@@ -76,9 +66,11 @@ def parse_args():
     parser.add_argument('--extra_features', nargs='+', default=[], help='select which features  to add')
     parser.add_argument('--downsample', type=bool, default=False, help='downsample data')
     parser.add_argument('--calculate_geometry', type=bool, default=False, help='decide where to calculate geometry')
+    parser.add_argument('--class8', type=bool, default=True, help='Select 17 classes or 8 classes data')
 
     return parser.parse_args()
 
+''''''
 
 class TestCustomDataset():
     # prepare to give prediction on each points
@@ -329,6 +321,22 @@ def main(args):
         print(str)
 
     '''Initialize'''
+    if args.class8 is False:
+        classes = classes_18
+        NUM_CLASSES = NUM_CLASSES_18
+    else:
+        classes = classes_8
+        NUM_CLASSES = NUM_CLASSES_8
+
+    sys.path.append(os.path.join(BASE_DIR, 'models'))
+    class2label = {cls: i for i, cls in enumerate(classes)}
+    seg_classes = class2label
+    seg_label_to_cat = {}
+    for i, cat in enumerate(seg_classes.keys()):
+        seg_label_to_cat[i] = cat
+    print(seg_label_to_cat)
+
+    
     root = args.rootdir
     BATCH_SIZE = args.batch_size
     NUM_POINT = args.num_point
