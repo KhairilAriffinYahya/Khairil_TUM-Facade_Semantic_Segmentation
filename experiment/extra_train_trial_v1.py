@@ -35,6 +35,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 classes = ["wall", "window", "door", "molding", "other", "terrain", "column", "arch"]
 NUM_CLASSES = 8
 train_ratio = 0.7
+dataColor = True #if data lack color set this to False
 
 ''''''
 
@@ -91,7 +92,7 @@ class TrainCustomDataset(Dataset):
         self.room_points, self.room_labels = [], []
         self.room_coord_min, self.room_coord_max = [], []
 
-        # For Geometric Features
+        # For Extra Features
         self.extra_features = []
         self.extra_features_data = []
         self.non_index = []
@@ -112,7 +113,12 @@ class TrainCustomDataset(Dataset):
         labelweights = np.zeros(adjustedclass)
 
         new_class_mapping = {1: 0, 2: 1, 3: 2, 6: 3, 13: 4, 11: 5, 7: 6, 8: 7}
-
+        
+        if dataColor is True:        
+            feature_list.append("red")
+            feature_list.append("blue")
+            feature_list.append("green")
+        
         for feature in feature_list:
             self.extra_features.append(feature)
             self.num_extra_features += 1
@@ -202,15 +208,16 @@ class TrainCustomDataset(Dataset):
         selected_points[:, 1] = selected_points[:, 1] - center[1]
         current_points[:, 0:3] = selected_points
 
+        #Extra feature to be added
         num_of_features = current_points.shape[1]
         current_features = current_points
 
-        geo_features = []
+        ex_features = []
         for ix in range(extra_num):
             features_room = self.extra_features_data[room_idx]
             features_points = features_room[ix]
             selected_feature = features_points[selected_point_idxs]  # num_point * lp_features
-            geo_features.append(selected_feature)
+            ex_features.append(selected_feature)
             num_of_features += 1
 
         tmp_np_features = np.zeros((self.num_point, num_of_features))
@@ -218,7 +225,7 @@ class TrainCustomDataset(Dataset):
         features_loop = num_of_features - current_points.shape[1]
         for i in range(features_loop):
             col_pointer = i + current_points.shape[1]
-            tmp_np_features[:, col_pointer] = geo_features[i]
+            tmp_np_features[:, col_pointer] = ex_features[i]
         current_features = tmp_np_features
 
         current_labels = labels[selected_point_idxs]

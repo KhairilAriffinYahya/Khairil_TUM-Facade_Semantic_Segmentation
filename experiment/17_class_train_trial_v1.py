@@ -36,6 +36,8 @@ classes = ["total", "wall", "window",  "door",  "balcony","molding", "deco", "co
 NUM_CLASSES = 18
 train_ratio = 0.7
 
+dataColor = True #if data lack color set this to False
+
 ''''''
 
 sys.path.append(os.path.join(BASE_DIR, 'models'))
@@ -82,6 +84,14 @@ class TrainCustomDataset(Dataset):
         self.num_classes = num_classes
         self.room_points, self.room_labels = [], []
         self.room_coord_min, self.room_coord_max = [], []
+        self.num_extra_features = 0
+        self.extra_features_data = []
+
+
+        feature_list=[]
+        if dataColor is True:
+          feature_list=['red','blue','green']
+          self.num_extra_features += 3
 
 
         # Return early if las_file_list is None
@@ -132,6 +142,10 @@ class TrainCustomDataset(Dataset):
         labels = self.room_labels[room_idx]   # N
         N_points = points.shape[0]
 
+
+
+        extra_num = len(self.extra_features_data)
+
         while (True):
             center = points[np.random.choice(N_points)][:3]
             block_min = center - [self.block_size / 2.0, self.block_size / 2.0, 0]
@@ -155,11 +169,33 @@ class TrainCustomDataset(Dataset):
         selected_points[:, 0] = selected_points[:, 0] - center[0]
         selected_points[:, 1] = selected_points[:, 1] - center[1]
         current_points[:, 0:3] = selected_points
+
+        #Extra feature to be added
+        num_of_features = current_points.shape[1]
+        current_features = current_points
+
+        ex_features = []
+        for ix in range(extra_num):
+            features_room = self.extra_features_data[room_idx]
+            features_points = features_room[ix]
+            selected_feature = features_points[selected_point_idxs]  # num_point * lp_features
+            ex_features.append(selected_feature)
+            num_of_features += 1
+
+        tmp_np_features = np.zeros((self.num_point, num_of_features))
+        tmp_np_features[:, 0:current_points.shape[1]] = current_features
+        features_loop = num_of_features - current_points.shape[1]
+        for i in range(features_loop):
+            col_pointer = i + current_points.shape[1]
+            tmp_np_features[:, col_pointer] = ex_features[i]
+        current_features = tmp_np_features
+
+
         current_labels = labels[selected_point_idxs]
         if self.transform is not None:
-            current_points, current_labels = self.transform(current_points, current_labels)
+            current_features, current_labels = self.transform(current_features, current_labels)
 
-        return current_points, current_labels
+        return current_features, current_labels
 
     def __len__(self):
         return len(self.room_idxs)
@@ -190,6 +226,8 @@ class TrainCustomDataset(Dataset):
         copied_dataset.room_labels = self.room_labels.copy()
         copied_dataset.room_coord_min = self.room_coord_min.copy()
         copied_dataset.room_coord_max = self.room_coord_max.copy()
+        copied_dataset.num_extra_features = self.num_extra_features
+        copied_dataset.extra_features_data = self.extra_features_data
 
         if indices is not None:
             copied_dataset.room_idxs = self.room_idxs[indices]
@@ -328,7 +366,7 @@ def main(args):
     MODEL = importlib.import_module(args.model)
     shutil.copy('models/%s.py' % args.model, str(experiment_dir))
     shutil.copy('models/pointnet2_utils.py', str(experiment_dir))
-    num_extra_features = 0
+    num_extra_features = TRAIN_DATASET.num_extra_features
     print("number = %d" % num_extra_features)
     classifier = MODEL.get_model(NUM_CLASSES, num_extra_features).cuda()  # name sensitive but not case sensitive
     criterion = MODEL.get_loss().cuda()

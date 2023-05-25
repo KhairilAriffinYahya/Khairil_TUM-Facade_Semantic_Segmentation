@@ -35,6 +35,7 @@ NUM_CLASSES = 8
 #NUM_CLASSES = 18
 
 train_ratio = 0.7
+dataColor = True #if data lack color set this to False
 
 ''''''
 
@@ -94,7 +95,7 @@ class TestCustomDataset():
         self.num_extra_features = 0
         self.num_classes = num_classes
 
-        # For Geometric Features
+        # For Extra Features
         self.extra_features = []
         self.extra_features_data = []
         self.non_index = []
@@ -109,6 +110,11 @@ class TestCustomDataset():
 
         new_class_mapping = {1: 0, 2: 1, 3: 2, 6: 3, 13: 4, 11: 5, 7: 6, 8: 7}
 
+        if dataColor is True:        
+            feature_list.append("red")
+            feature_list.append("blue")
+            feature_list.append("green")
+            
         for feature in feature_list:
             self.extra_features.append(feature)
             self.num_extra_features += 1
@@ -143,6 +149,7 @@ class TestCustomDataset():
             # Map merged labels to new labels (0 to 7)
             labels = np.vectorize(new_class_mapping.get)(labels)
 
+            #Compile the data extracted
             data = np.hstack((points, labels.reshape((-1, 1))))
             self.scene_points_list.append(data[:, :3])
             self.semantic_labels_list.append(data[:, 3])
@@ -197,20 +204,21 @@ class TestCustomDataset():
                 data_batch[:, 0] = data_batch[:, 0] - (s_x + self.block_size / 2.0)
                 data_batch[:, 1] = data_batch[:, 1] - (s_y + self.block_size / 2.0)
                 data_batch = np.concatenate((data_batch, normlized_xyz), axis=1)
-
+                label_batch = labels[point_idxs].astype(int)
+                batch_weight = self.labelweights[label_batch]
+                
+                # Extra Feature to be included
                 tmp_features = []
                 for ix in  range(extra_num):
                     features_room = self.extra_features_data[index] # Load the features
                     features_points = features_room[ix]
                     selected_feature = features_points[point_idxs]  # num_point * lp_features
                     tmp_features.append(selected_feature)
-
                 tmp_np_features = np.array(tmp_features).reshape(-1, 1)
+                
                 data_batch = np.concatenate((data_batch, tmp_np_features), axis=1)
-
-                label_batch = labels[point_idxs].astype(int)
-                batch_weight = self.labelweights[label_batch]
-
+                
+                #Compile extracted data
                 data_room = np.vstack([data_room, data_batch]) if data_room.size else data_batch
                 label_room = np.hstack([label_room, label_batch]) if label_room.size else label_batch
                 sample_weight = np.hstack([sample_weight, batch_weight]) if label_room.size else batch_weight

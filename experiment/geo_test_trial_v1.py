@@ -30,6 +30,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 classes = ["wall", "window", "door", "molding", "other", "terrain", "column", "arch"]
 NUM_CLASSES = 8
 train_ratio = 0.7
+dataColor = True #if data lack color set this to False
 
 ''''''
 
@@ -87,9 +88,10 @@ class TestCustomDataset():
         self.semantic_labels_list = []
         self.room_coord_min, self.room_coord_max = [], []
         self.labelweights = np.zeros(num_classes)
-        self.num_extra_features = 0
         self.num_classes = num_classes
-
+        self.num_extra_features = 0
+        self.extra_features_data = []
+        
         # For Geometric Features
         self.lp_data = []
         self.lo_data = []
@@ -105,6 +107,12 @@ class TestCustomDataset():
         range_class = adjustedclass + 1
 
         new_class_mapping = {1: 0, 2: 1, 3: 2, 6: 3, 13: 4, 11: 5, 7: 6, 8: 7}
+
+        feature_list=[]
+        if dataColor is True:
+          feature_list=['red','blue','green']
+          for feature in feature_list:
+              self.num_extra_features += 1
 
         if 'p' in args.geometry_features:
             self.num_extra_features += 1
@@ -130,6 +138,16 @@ class TestCustomDataset():
                 if 'c' in args.geometry_features:
                     tmp_c = np.array(in_file.surface_variation, dtype=np.float64)
                     self.lc_data.append(tmp_c)
+                    
+            # Retrieve color points
+            tmp_features = []
+            for feature in feature_list:
+                # Retrieve the variable with the same name as the feature from `las_data`
+                feature_value = getattr(las_data, feature)
+                tmp_features.append(feature_value)
+
+            if len(feature_list) > 0:
+                self.extra_features_data.append(tmp_features)
 
             # Merge labels as per instructions
             labels[(labels == 5) | (labels == 6)] = 6  # Merge molding and decoration
@@ -167,6 +185,9 @@ class TestCustomDataset():
         grid_y = int(np.ceil(float(coord_max[1] - coord_min[1] - self.block_size) / self.stride) + 1)
         data_room, label_room, sample_weight, index_room = np.array([]), np.array([]), np.array([]), np.array([])
 
+
+        extra_num = len(self.extra_features_data)
+
         for index_y in range(grid_y):
             for index_x in range(grid_x):
                 s_x = coord_min[0] + index_x * self.stride
@@ -194,7 +215,11 @@ class TestCustomDataset():
                 data_batch[:, 0] = data_batch[:, 0] - (s_x + self.block_size / 2.0)
                 data_batch[:, 1] = data_batch[:, 1] - (s_y + self.block_size / 2.0)
                 data_batch = np.concatenate((data_batch, normlized_xyz), axis=1)
-
+                label_batch = labels[point_idxs].astype(int)
+                batch_weight = self.labelweights[label_batch]
+                
+                #Extra features to be included
+                
                 geo_features = []
                 if 'p' in args.geometry_features:  # Load the lp features
                     lp_room = self.lp_data[index]
@@ -208,13 +233,20 @@ class TestCustomDataset():
                     lc_room = self.lc_data[index]
                     selected_lc = lc_room[point_idxs]  # num_point * lc_features
                     geo_features.append(selected_lc)
+                tmp_geo_features = np.array(geo_features).reshape(-1, 1)
 
-                tmp_features = np.array(geo_features).reshape(-1, 1)
-                data_batch = np.concatenate((data_batch, tmp_features), axis=1)
 
-                label_batch = labels[point_idxs].astype(int)
-                batch_weight = self.labelweights[label_batch]
+                tmp_features = []
+                for ix in  range(extra_num):
+                    features_room = self.extra_features_data[index] # Load the features
+                    features_points = features_room[ix]
+                    selected_feature = features_points[point_idxs]  # num_point * lp_features
+                    tmp_features.append(selected_feature)
+                tmp_np_features = np.array(tmp_features).reshape(-1, 1)
+                
+                data_batch = np.concatenate((data_batch, tmp_np_features,tmp_geo_features), axis=1)
 
+                #Compile the data extracted
                 data_room = np.vstack([data_room, data_batch]) if data_room.size else data_batch
                 label_room = np.hstack([label_room, label_batch]) if label_room.size else label_batch
                 sample_weight = np.hstack([sample_weight, batch_weight]) if label_room.size else batch_weight
@@ -273,6 +305,7 @@ class TestCustomDataset():
         new_dataset.lc_data = self.lc_data
         new_dataset.non_index = self.non_index
         new_dataset.num_extra_features = self.num_extra_features
+        new_dataset.extra_features_data = self.extra_features_data
 
         new_dataset.scene_points_list = [self.scene_points_list[i] for i in new_indices]
         new_dataset.semantic_labels_list = [self.semantic_labels_list[i] for i in new_indices]
