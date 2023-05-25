@@ -37,8 +37,6 @@ classes = ["wall", "window", "door", "molding", "other", "terrain", "column", "a
 NUM_CLASSES = 8
 train_ratio = 0.7
 
-dataColor = True #if data lack color set this to False
-
 ''''''
 
 sys.path.append(os.path.join(BASE_DIR, 'models'))
@@ -92,10 +90,9 @@ class TrainCustomDataset(Dataset):
         self.block_size = block_size
         self.transform = transform
         self.num_classes = num_classes
+        self.num_extra_features = 0
         self.room_points, self.room_labels = [], []
         self.room_coord_min, self.room_coord_max = [], []
-        self.num_extra_features = 0
-        self.extra_features_data = []
 
         # For Geometric Features
         self.lp_data = []
@@ -120,12 +117,6 @@ class TrainCustomDataset(Dataset):
 
         new_class_mapping = {1: 0, 2: 1, 3: 2, 6: 3, 13: 4, 11: 5, 7: 6, 8: 7}
 
-        feature_list=[]
-        if dataColor is True:
-          feature_list=['red','blue','green']
-          for feature in feature_list:
-              self.num_extra_features += 1
-
         if 'p' in args.geometry_features:
             self.num_extra_features += 1
         if 'o' in args.geometry_features:
@@ -149,15 +140,6 @@ class TrainCustomDataset(Dataset):
                 if 'c' in args.geometry_features:
                     tmp_c = np.array(las_data.surface_variation, dtype=np.float64)
                     self.lc_data.append(tmp_c)
-
-            tmp_features = []
-            for feature in feature_list:
-                # Retrieve the variable with the same name as the feature from `las_data`
-                feature_value = getattr(las_data, feature)
-                tmp_features.append(feature_value)
-
-            if len(feature_list) > 0:
-                self.extra_features_data.append(tmp_features)
 
             # Merge labels as per instructions
             labels[(labels == 5) | (labels == 6)] = 6  # Merge molding and decoration
@@ -201,8 +183,6 @@ class TrainCustomDataset(Dataset):
         labels = self.room_labels[room_idx]  # N
         N_points = points.shape[0]
 
-        extra_num = len(self.extra_features_data)
-
         while (True):
             center = points[np.random.choice(N_points)][:3]
             block_min = center - [self.block_size / 2.0, self.block_size / 2.0, 0]
@@ -229,47 +209,36 @@ class TrainCustomDataset(Dataset):
         selected_points[:, 1] = selected_points[:, 1] - center[1]
         current_points[:, 0:3] = selected_points
 
-
-        #Extra Features to be included
         num_of_features = current_points.shape[1]
         current_features = current_points
-      
-        ex_features = []
+
+        geo_features = []
         if 'p' in args.geometry_features:
             lp_room = self.lp_data[room_idx]
             selected_lp = lp_room[selected_point_idxs]  # num_point * lp_features
-            ex_features.append(selected_lp)
+            geo_features.append(selected_lp)
             num_of_features += 1
         if 'o' in args.geometry_features:
             lo_room = self.lo_data[room_idx]
             selected_lo = lo_room[selected_point_idxs]  # num_point * lo_features
-            ex_features.append(selected_lo)
+            geo_features.append(selected_lo)
             num_of_features += 1
         if 'c' in args.geometry_features:
             lc_room = self.lc_data[room_idx]
             selected_lc = lc_room[selected_point_idxs]  # num_point * lc_features
-            ex_features.append(selected_lc)
-            num_of_features += 1
-
-        for ix in range(extra_num):
-            features_room = self.extra_features_data[room_idx]
-            features_points = features_room[ix]
-            selected_feature = features_points[selected_point_idxs]  # num_point * lp_features
-            ex_features.append(selected_feature)
+            geo_features.append(selected_lc)
             num_of_features += 1
 
 
         tmp_np_features = np.zeros((self.num_point, num_of_features))
         tmp_np_features[:, 0:current_points.shape[1]] = current_features
         features_loop = num_of_features - current_points.shape[1]
-        
-
         for i in range(features_loop):
             col_pointer = i + current_points.shape[1]
-            tmp_np_features[:, col_pointer] = ex_features[i]
-            
+            tmp_np_features[:, col_pointer] = geo_features[i]
         current_features = tmp_np_features
-        current_labels = labels[selected_point_idxs] 
+
+        current_labels = labels[selected_point_idxs]
         if self.transform is not None:
             current_features, current_labels = self.transform(current_features, current_labels)
 
@@ -314,7 +283,6 @@ class TrainCustomDataset(Dataset):
         copied_dataset.room_coord_min = self.room_coord_min.copy()
         copied_dataset.room_coord_max = self.room_coord_max.copy()
         copied_dataset.num_extra_features = self.num_extra_features
-        copied_dataset.extra_features_data = self.extra_features_data
 
         if indices is not None:
             copied_dataset.room_idxs = self.room_idxs[indices]

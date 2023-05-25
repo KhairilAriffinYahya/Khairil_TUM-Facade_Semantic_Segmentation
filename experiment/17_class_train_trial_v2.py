@@ -6,20 +6,20 @@ import logging
 import sys
 import importlib
 import shutil
-import pytz
 import numpy as np
 import laspy
 import glob
 import matplotlib.pyplot as plt
 import time
 import pickle
+import pytz
 import open3d as o3d
-import provider
 import h5py
+import provider
 from models.localfunctions import timePrint, CurrentTime, inplace_relu, modelTraining
-from pathlib import Path
 from collections import Counter
 from torch.utils.data import Dataset, DataLoader, random_split
+from pathlib import Path
 from tqdm import tqdm
 
 '''Adjust permanent/file/static variables here'''
@@ -27,14 +27,16 @@ from tqdm import tqdm
 timezone = pytz.timezone('Asia/Singapore')
 print("Check current time")
 CurrentTime(timezone)
-saveTrain = "8cla_traindata.pkl"
-saveEval = "8cla_evaldata.pkl"
+saveTrain = "17cla_traindata.pkl"
+saveEval = "17cla_evaldata.pkl"
 saveDir = "/content/Khairil_PN2_experiment/experiment/data/saved_data/"
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-# 0: wall, # 1: window, # 2: door, # 3: molding, # 4: other, # 5: terrain, # 6: column, # 7: arch
-classes = ["wall", "window",  "door",  "molding", "other", "terrain", "column", "arch"]
-NUM_CLASSES = 8
+classes = ["total", "wall", "window",  "door",  "balcony","molding", "deco", "column", "arch", "drainpipe", "stairs",  "ground surface",
+  "terrain",  "roof",  "blinds", "outer ceiling surface", "interior", "other"]
+NUM_CLASSES = 18
 train_ratio = 0.7
+
+dataColor = True #if data lack color set this to False
 
 ''''''
 
@@ -82,6 +84,14 @@ class TrainCustomDataset(Dataset):
         self.num_classes = num_classes
         self.room_points, self.room_labels = [], []
         self.room_coord_min, self.room_coord_max = [], []
+        self.num_extra_features = 0
+        self.extra_features_data = []
+
+
+        feature_list=[]
+        if dataColor is True:
+          feature_list=['red','blue','green']
+          self.num_extra_features += 3
 
 
         # Return early if las_file_list is None
@@ -99,24 +109,12 @@ class TrainCustomDataset(Dataset):
         num_point_all = []
         labelweights = np.zeros(adjustedclass)
 
-        new_class_mapping = {1: 0, 2: 1, 3:2, 6: 3, 13: 4, 11: 5, 7: 6, 8: 7}
-
         for room_path in rooms:
             # Read LAS file
             print("Reading = " + room_path)
             las_data = laspy.read(room_path)
             coords = np.vstack((las_data.x, las_data.y, las_data.z)).transpose()
             labels = np.array(las_data.classification, dtype=np.uint8)
-
-            # Merge labels as per instructions
-            labels[(labels == 5) | (labels == 6)] = 6  # Merge molding and decoration
-            labels[(labels == 1) |(labels == 9) | (labels == 15) | (labels == 10)] = 1  # Merge wall, drainpipe, outer ceiling surface, and stairs
-            labels[(labels == 12) | (labels == 11)] = 11  # Merge terrain and ground surface
-            labels[(labels == 13) | (labels == 16) | (labels == 17)] = 13  # Merge interior, roof, and other
-            labels[labels == 14] = 2  # Add blinds to window
-
-            # Map merged labels to new labels (0 to 7)
-            labels = np.vectorize(new_class_mapping.get)(labels)
 
             room_data = np.concatenate((coords, labels[:, np.newaxis]), axis=1)  # xyzl, N*4
             points, labels = room_data[:, 0:3], room_data[:, 3]  # xyz, N*3; l, N
@@ -134,6 +132,7 @@ class TrainCustomDataset(Dataset):
         for index in range(len(rooms)):
             room_idxs.extend([index] * int(round(sample_prob[index] * num_iter)))
         self.room_idxs = np.array(room_idxs)
+        # print(labelweights)
 
         print("Totally {} samples in dataset.".format(len(self.room_idxs)))
 
@@ -142,6 +141,10 @@ class TrainCustomDataset(Dataset):
         points = self.room_points[room_idx]   # N * 6
         labels = self.room_labels[room_idx]   # N
         N_points = points.shape[0]
+
+
+
+        extra_num = len(self.extra_features_data)
 
         while (True):
             center = points[np.random.choice(N_points)][:3]
@@ -166,11 +169,33 @@ class TrainCustomDataset(Dataset):
         selected_points[:, 0] = selected_points[:, 0] - center[0]
         selected_points[:, 1] = selected_points[:, 1] - center[1]
         current_points[:, 0:3] = selected_points
+
+        #Extra feature to be added
+        num_of_features = current_points.shape[1]
+        current_features = current_points
+
+        ex_features = []
+        for ix in range(extra_num):
+            features_room = self.extra_features_data[room_idx]
+            features_points = features_room[ix]
+            selected_feature = features_points[selected_point_idxs]  # num_point * lp_features
+            ex_features.append(selected_feature)
+            num_of_features += 1
+
+        tmp_np_features = np.zeros((self.num_point, num_of_features))
+        tmp_np_features[:, 0:current_points.shape[1]] = current_features
+        features_loop = num_of_features - current_points.shape[1]
+        for i in range(features_loop):
+            col_pointer = i + current_points.shape[1]
+            tmp_np_features[:, col_pointer] = ex_features[i]
+        current_features = tmp_np_features
+
+
         current_labels = labels[selected_point_idxs]
         if self.transform is not None:
-            current_points, current_labels = self.transform(current_points, current_labels)
+            current_features, current_labels = self.transform(current_features, current_labels)
 
-        return current_points, current_labels
+        return current_features, current_labels
 
     def __len__(self):
         return len(self.room_idxs)
@@ -201,6 +226,8 @@ class TrainCustomDataset(Dataset):
         copied_dataset.room_labels = self.room_labels.copy()
         copied_dataset.room_coord_min = self.room_coord_min.copy()
         copied_dataset.room_coord_max = self.room_coord_max.copy()
+        copied_dataset.num_extra_features = self.num_extra_features
+        copied_dataset.extra_features_data = self.extra_features_data
 
         if indices is not None:
             copied_dataset.room_idxs = self.room_idxs[indices]
@@ -252,7 +279,6 @@ def main(args):
         experiment_dir = Path('./log/')
     else:
         experiment_dir = Path(args.exp_dir)
-        print(experiment_dir)
     experiment_dir.mkdir(exist_ok=True)
     experiment_dir = experiment_dir.joinpath('sem_seg')
     experiment_dir.mkdir(exist_ok=True)
@@ -267,7 +293,7 @@ def main(args):
     log_dir = experiment_dir.joinpath('logs/')
     log_dir.mkdir(exist_ok=True)
     print("Logs Directory = " +str(log_dir))
-    
+
     '''LOG'''
     args = parse_args()
     logger = logging.getLogger("Model")
@@ -281,7 +307,7 @@ def main(args):
     log_string(args)
 
     '''Load Dataset'''
-    loadtime = time.time()
+    loadtime=time.time()
 
     if args.load is False:
         lidar_dataset = TrainCustomDataset(las_file_list, num_classes=NUM_CLASSES, num_point=NUM_POINT, transform=None)
@@ -299,8 +325,8 @@ def main(args):
         EVAL_DATASET = lidar_dataset.copy(indices=eval_indices)
     else:
         print("Load previously saved dataset")
-        TRAIN_DATASET = TrainCustomDataset.load_data(saveDir + saveTrain)
-        EVAL_DATASET = TrainCustomDataset.load_data(saveDir + saveEval)
+        TRAIN_DATASET=TrainCustomDataset.load_data(saveDir+saveTrain)
+        EVAL_DATASET=TrainCustomDataset.load_data(saveDir+saveEval)
 
     print("Total {} samples in training dataset.".format(len(TRAIN_DATASET)))
     print("Total {} samples in evaluation dataset.".format(len(EVAL_DATASET)))
@@ -323,7 +349,8 @@ def main(args):
 
     train_labelweights = TRAIN_DATASET.calculate_labelweights()
 
-    print("wall", "window", "door", "molding", "other", "terrain", "column", "arch")
+    print("total points,	1 wall,	2 window,	3 door,	4 balcony,	5 molding,	6 deco,	7 column,	8 arch,	9 drainpipe,	10 stairs,	11 ground surface,	12 terrain,	13 roof,	14 blinds,	15 outer ceiling surface,	16 interior,	17 other ")
+    print(train_labelweights)
     train_weights = torch.Tensor(train_labelweights).cuda()
 
     log_string("The number of training data is: %d" % len(TRAIN_DATASET))
@@ -339,8 +366,7 @@ def main(args):
     MODEL = importlib.import_module(args.model)
     shutil.copy('models/%s.py' % args.model, str(experiment_dir))
     shutil.copy('models/pointnet2_utils.py', str(experiment_dir))
-
-    num_extra_features = 0
+    num_extra_features = TRAIN_DATASET.num_extra_features
     print("number = %d" % num_extra_features)
     classifier = MODEL.get_model(NUM_CLASSES, num_extra_features).cuda()  # name sensitive but not case sensitive
     criterion = MODEL.get_loss().cuda()

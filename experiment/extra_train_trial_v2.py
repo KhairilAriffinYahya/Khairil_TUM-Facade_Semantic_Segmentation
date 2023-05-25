@@ -3,6 +3,7 @@ import os
 import torch
 import datetime
 import logging
+from pathlib import Path
 import sys
 import importlib
 import shutil
@@ -13,28 +14,28 @@ import glob
 import matplotlib.pyplot as plt
 import time
 import pickle
-import open3d as o3d
-import provider
 import h5py
+import provider
+import open3d as o3d
+from tqdm import tqdm
 from models.localfunctions import timePrint, CurrentTime, inplace_relu, modelTraining
-from pathlib import Path
 from collections import Counter
 from torch.utils.data import Dataset, DataLoader, random_split
-from tqdm import tqdm
 
 '''Adjust permanent/file/static variables here'''
 
 timezone = pytz.timezone('Asia/Singapore')
 print("Check current time")
 CurrentTime(timezone)
-saveTrain = "8cla_traindata.pkl"
-saveEval = "8cla_evaldata.pkl"
+saveTrain = "geo_traindata.pkl"
+saveEval = "geo_evaldata.pkl"
 saveDir = "/content/Khairil_PN2_experiment/experiment/data/saved_data/"
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 # 0: wall, # 1: window, # 2: door, # 3: molding, # 4: other, # 5: terrain, # 6: column, # 7: arch
-classes = ["wall", "window",  "door",  "molding", "other", "terrain", "column", "arch"]
+classes = ["wall", "window", "door", "molding", "other", "terrain", "column", "arch"]
 NUM_CLASSES = 8
 train_ratio = 0.7
+dataColor = True #if data lack color set this to False
 
 ''''''
 
@@ -47,6 +48,7 @@ for i, cat in enumerate(seg_classes.keys()):
 
 print(seg_label_to_cat)
 
+
 # Adjust parameters here if there no changes to reduce line
 def parse_args():
     parser = argparse.ArgumentParser('Model')
@@ -56,33 +58,44 @@ def parse_args():
     parser.add_argument('--epoch', default=32, type=int, help='Epoch to run [default: 32]')
     parser.add_argument('--learning_rate', default=0.001, type=float, help='Initial learning rate [default: 0.001]')
     parser.add_argument('--gpu', type=str, default='0', help='GPU to use [default: GPU 0]')
-    parser.add_argument('--optimizer', type=str, default='Adam', help='Adam or SGD [default: Adam]') #maybe static
+    parser.add_argument('--optimizer', type=str, default='Adam', help='Adam or SGD [default: Adam]')
     parser.add_argument('--log_dir', type=str, default='pointnet2_sem_seg', help='Log path [default: None]')
     parser.add_argument('--exp_dir', type=str, default='./log/', help='Log path [default: None]')
     parser.add_argument('--decay_rate', type=float, default=1e-4, help='weight decay [default: 1e-4]')
     parser.add_argument('--npoint', type=int, default=4096, help='Point Number [default: 4096]')
     parser.add_argument('--step_size', type=int, default=10, help='Decay step for lr decay [default: every 10 epochs]')
     parser.add_argument('--lr_decay', type=float, default=0.7, help='Decay rate for lr decay [default: 0.7]')
-    parser.add_argument('--test_area', type=str, default='DEBY_LOD2_4959323.las', help='Which area to use for test, option: 1-6 [default: 5]')
     parser.add_argument('--output_model', type=str, default='/best_model.pth', help='model output name')
-    parser.add_argument('--rootdir', type=str, default='/content/drive/MyDrive/ data/tum/tum-facade/training/selected/', help='directory to data')
+    parser.add_argument('--test_area', type=str, default="cc_o_clipped_Local_DEBY_LOD2_4959323_cc.las",
+                        help='Which area to use for test, option: 1-6 [default: 5]')
+    parser.add_argument('--rootdir', type=str,
+                        default="/content/drive/MyDrive/ data/tum/tum-facade/training/cc_selected/CC/",
+                        help='directory to data')
     parser.add_argument('--load', type=bool, default=False, help='load saved data or new')
     parser.add_argument('--save', type=bool, default=False, help='save data')
-
+    parser.add_argument('--visualizeModel', type=str, default=False, help='directory to data')
+    parser.add_argument('--extra_features', nargs='+', default=[], help='select which features  to add')
 
     return parser.parse_args()
 
 
 class TrainCustomDataset(Dataset):
-    def __init__(self, las_file_list=None, num_classes=8, num_point=4096, block_size=1.0, sample_rate=1.0, transform=None):
+    def __init__(self, las_file_list=None, feature_list=[], num_classes=8, num_point=4096, block_size=1.0,
+                 sample_rate=1.0,
+                 transform=None, indices=None):
         super().__init__()
         self.num_point = num_point
         self.block_size = block_size
         self.transform = transform
         self.num_classes = num_classes
+        self.num_extra_features = 0
         self.room_points, self.room_labels = [], []
         self.room_coord_min, self.room_coord_max = [], []
 
+        # For Extra Features
+        self.extra_features = []
+        self.extra_features_data = []
+        self.non_index = []
 
         # Return early if las_file_list is None
         if las_file_list is None:
@@ -90,7 +103,7 @@ class TrainCustomDataset(Dataset):
             return
 
         adjustedclass = num_classes
-        range_class = num_classes+1
+        range_class = num_classes + 1
 
         # Use glob to find all .las files in the data_root directory
         las_files = las_file_list
@@ -99,7 +112,16 @@ class TrainCustomDataset(Dataset):
         num_point_all = []
         labelweights = np.zeros(adjustedclass)
 
-        new_class_mapping = {1: 0, 2: 1, 3:2, 6: 3, 13: 4, 11: 5, 7: 6, 8: 7}
+        new_class_mapping = {1: 0, 2: 1, 3: 2, 6: 3, 13: 4, 11: 5, 7: 6, 8: 7}
+        
+        if dataColor is True:        
+            feature_list.append("red")
+            feature_list.append("blue")
+            feature_list.append("green")
+        
+        for feature in feature_list:
+            self.extra_features.append(feature)
+            self.num_extra_features += 1
 
         for room_path in rooms:
             # Read LAS file
@@ -108,9 +130,19 @@ class TrainCustomDataset(Dataset):
             coords = np.vstack((las_data.x, las_data.y, las_data.z)).transpose()
             labels = np.array(las_data.classification, dtype=np.uint8)
 
+            tmp_features = []
+            for feature in feature_list:
+                # Retrieve the variable with the same name as the feature from `las_data`
+                feature_value = getattr(las_data, feature)
+                tmp_features.append(feature_value)
+
+            if self.num_extra_features > 0:
+                self.extra_features_data.append(tmp_features)
+
             # Merge labels as per instructions
             labels[(labels == 5) | (labels == 6)] = 6  # Merge molding and decoration
-            labels[(labels == 1) |(labels == 9) | (labels == 15) | (labels == 10)] = 1  # Merge wall, drainpipe, outer ceiling surface, and stairs
+            labels[(labels == 1) | (labels == 9) | (labels == 15) | (
+                    labels == 10)] = 1  # Merge wall, drainpipe, outer ceiling surface, and stairs
             labels[(labels == 12) | (labels == 11)] = 11  # Merge terrain and ground surface
             labels[(labels == 13) | (labels == 16) | (labels == 17)] = 13  # Merge interior, roof, and other
             labels[labels == 14] = 2  # Add blinds to window
@@ -123,8 +155,10 @@ class TrainCustomDataset(Dataset):
             tmp, _ = np.histogram(labels, range(range_class))
             labelweights += tmp
             coord_min, coord_max = np.amin(points, axis=0), np.amax(points, axis=0)
-            self.room_points.append(points), self.room_labels.append(labels)
-            self.room_coord_min.append(coord_min), self.room_coord_max.append(coord_max)
+            self.room_points.append(points)
+            self.room_labels.append(labels)
+            self.room_coord_min.append(coord_min)
+            self.room_coord_max.append(coord_max)
             num_point_all.append(labels.size)
 
         sample_prob = num_point_all / np.sum(num_point_all)
@@ -135,20 +169,27 @@ class TrainCustomDataset(Dataset):
             room_idxs.extend([index] * int(round(sample_prob[index] * num_iter)))
         self.room_idxs = np.array(room_idxs)
 
+        if indices is not None:
+            self.room_idxs = self.room_idxs[indices]
+
+        print("Extra features to be included = %d" % self.num_extra_features)
         print("Totally {} samples in dataset.".format(len(self.room_idxs)))
 
     def __getitem__(self, idx):
         room_idx = self.room_idxs[idx]
-        points = self.room_points[room_idx]   # N * 6
-        labels = self.room_labels[room_idx]   # N
+        points = self.room_points[room_idx]  # N * 6
+        labels = self.room_labels[room_idx]  # N
         N_points = points.shape[0]
+        extra_num = self.num_extra_features
 
         while (True):
             center = points[np.random.choice(N_points)][:3]
             block_min = center - [self.block_size / 2.0, self.block_size / 2.0, 0]
             block_max = center + [self.block_size / 2.0, self.block_size / 2.0, 0]
-            point_idxs = np.where((points[:, 0] >= block_min[0]) & (points[:, 0] <= block_max[0]) & 
-                              (points[:, 1] >= block_min[1]) & (points[:, 1] <= block_max[1]))[0]
+            point_idxs = np.where((points[:, 0] >= block_min[0]) & (points[:, 0] <= block_max[0]) & (points[:, 1]
+                                                                                                     >= block_min[
+                                                                                                         1]) & (
+                                              points[:, 1] <= block_max[1]))[0]
             if point_idxs.size > 1024:
                 break
 
@@ -166,16 +207,37 @@ class TrainCustomDataset(Dataset):
         selected_points[:, 0] = selected_points[:, 0] - center[0]
         selected_points[:, 1] = selected_points[:, 1] - center[1]
         current_points[:, 0:3] = selected_points
+
+        #Extra feature to be added
+        num_of_features = current_points.shape[1]
+        current_features = current_points
+
+        ex_features = []
+        for ix in range(extra_num):
+            features_room = self.extra_features_data[room_idx]
+            features_points = features_room[ix]
+            selected_feature = features_points[selected_point_idxs]  # num_point * lp_features
+            ex_features.append(selected_feature)
+            num_of_features += 1
+
+        tmp_np_features = np.zeros((self.num_point, num_of_features))
+        tmp_np_features[:, 0:current_points.shape[1]] = current_features
+        features_loop = num_of_features - current_points.shape[1]
+        for i in range(features_loop):
+            col_pointer = i + current_points.shape[1]
+            tmp_np_features[:, col_pointer] = ex_features[i]
+        current_features = tmp_np_features
+
         current_labels = labels[selected_point_idxs]
         if self.transform is not None:
-            current_points, current_labels = self.transform(current_points, current_labels)
+            current_features, current_labels = self.transform(current_features, current_labels)
 
-        return current_points, current_labels
+        return current_features, current_labels
 
     def __len__(self):
         return len(self.room_idxs)
 
-    def calculate_labelweights(self):
+    def calculate_labelweights(self):  # calculate weight of each label/class
         print("Calculate Weights")
         labelweights = np.zeros(self.num_classes)
         for labels in self.room_labels:
@@ -191,7 +253,17 @@ class TrainCustomDataset(Dataset):
 
         return labelweights
 
+    def filtered_indices(self):  # get new index list
+        total_indices = set(range(len(self.room_points)))
+        non_index_set = set(self.non_index)
+        filtered_indices = list(total_indices - non_index_set)
+        return filtered_indices
+
+    def index_update(self, newIndices):  # adjust index
+        self.room_idxs = newIndices
+
     def copy(self, indices=None):
+        # COPY EVERYTHING EXCEPT FOR INDEX
         copied_dataset = TrainCustomDataset()
         copied_dataset.num_point = self.num_point
         copied_dataset.block_size = self.block_size
@@ -201,7 +273,11 @@ class TrainCustomDataset(Dataset):
         copied_dataset.room_labels = self.room_labels.copy()
         copied_dataset.room_coord_min = self.room_coord_min.copy()
         copied_dataset.room_coord_max = self.room_coord_max.copy()
+        copied_dataset.num_extra_features = self.num_extra_features
+        copied_dataset.extra_features_data = self.extra_features_data
+        copied_dataset.extra_features = self.extra_features
 
+        # Index to be adjusted
         if indices is not None:
             copied_dataset.room_idxs = self.room_idxs[indices]
         else:
@@ -209,9 +285,6 @@ class TrainCustomDataset(Dataset):
 
         print("Totally {} samples in dataset.".format(len(copied_dataset.room_idxs)))
         return copied_dataset
-
-    def index_update(self, newIndices):
-        self.room_idxs = newIndices
 
     def save_data(self, file_path):
         with open(file_path, 'wb') as f:
@@ -221,27 +294,30 @@ class TrainCustomDataset(Dataset):
     def load_data(file_path):
         with open(file_path, 'rb') as f:
             dataset = pickle.load(f)
-        print("Number of Classes in dataset = %d" %dataset.num_classes)
+
+        print("Extra features to be included = %d" % dataset.num_extra_features)
+        print("Number of Classes in dataset = %d" % dataset.num_classes)
         print("Totally {} samples in dataset.".format(len(dataset.room_idxs)))
         return dataset
 
 
 def main(args):
-    #Log and print string
     def log_string(str):
         logger.info(str)
         print(str)
-
 
     '''Initialize Variables'''
     root = args.rootdir
     NUM_POINT = args.npoint
     BATCH_SIZE = args.batch_size
-    savetrain_path = saveDir+saveTrain
-    saveeval_path = saveDir+saveEval
-    las_file_list = [file for file in glob.glob(root + '/*.las') if not file.endswith(args.test_area )]
+    las_file_list = [file for file in glob.glob(root + '/*.las') if not file.endswith(args.test_area)]
     print("Number of Classes = %d" %NUM_CLASSES)
 
+    feature_list = []
+    for feature in args.extra_features:
+        feature_list.append(feature)
+    print("Extra features to be added")
+    print(feature_list)
 
     '''HYPER PARAMETER'''
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
@@ -252,7 +328,6 @@ def main(args):
         experiment_dir = Path('./log/')
     else:
         experiment_dir = Path(args.exp_dir)
-        print(experiment_dir)
     experiment_dir.mkdir(exist_ok=True)
     experiment_dir = experiment_dir.joinpath('sem_seg')
     experiment_dir.mkdir(exist_ok=True)
@@ -260,14 +335,14 @@ def main(args):
         experiment_dir = experiment_dir.joinpath(timestr)
     else:
         experiment_dir = experiment_dir.joinpath(args.log_dir)
-    print("Logging Directory = " +str(experiment_dir))
+    print("Logging Directory = " + str(experiment_dir))
     experiment_dir.mkdir(exist_ok=True)
     checkpoints_dir = experiment_dir.joinpath('checkpoints/')
     checkpoints_dir.mkdir(exist_ok=True)
     log_dir = experiment_dir.joinpath('logs/')
     log_dir.mkdir(exist_ok=True)
-    print("Logs Directory = " +str(log_dir))
-    
+    print("Logs Directory = " + str(log_dir))
+
     '''LOG'''
     args = parse_args()
     logger = logging.getLogger("Model")
@@ -280,11 +355,21 @@ def main(args):
     log_string('PARAMETER ...')
     log_string(args)
 
+    finding_name = False
+    if finding_name is True:
+        filename = las_file_list[0]
+        print(filename)
+        in_file = laspy.read(filename)
+        # print out the available point attributes
+        for dimension in in_file.point_format:
+            print(dimension.name)
+
     '''Load Dataset'''
     loadtime = time.time()
 
     if args.load is False:
-        lidar_dataset = TrainCustomDataset(las_file_list, num_classes=NUM_CLASSES, num_point=NUM_POINT, transform=None)
+        lidar_dataset = TrainCustomDataset(las_file_list, feature_list, num_classes=NUM_CLASSES, num_point=NUM_POINT,
+                                           transform=None)
         print("Dataset taken")
 
         # Split the dataset into training and evaluation sets
@@ -309,73 +394,74 @@ def main(args):
 
     if args.save is True:
         print("Save Dataset")
-        savetime=time.time()
-        TRAIN_DATASET.save_data(saveDir+saveTrain)
+        savetime = time.time()
+        TRAIN_DATASET.save_data(saveDir + saveTrain)
         EVAL_DATASET.save_data(saveDir + saveEval)
         timePrint(savetime)
         CurrentTime(timezone)
 
-    trainDataLoader = DataLoader(TRAIN_DATASET, batch_size=BATCH_SIZE, shuffle=True, num_workers=10,
-                                                  pin_memory=True, drop_last=True,
-                                                  worker_init_fn=lambda x: np.random.seed(x + int(time.time())))
-    evalDataLoader = DataLoader(EVAL_DATASET, batch_size=BATCH_SIZE, shuffle=False, num_workers=10,
-                                                 pin_memory=True, drop_last=True)
-
-    train_labelweights = TRAIN_DATASET.calculate_labelweights()
+    trainDataLoader = DataLoader(TRAIN_DATASET, batch_size=BATCH_SIZE, shuffle=True, num_workers=8,
+                                 pin_memory=True, drop_last=True,
+                                 worker_init_fn=lambda x: np.random.seed(x + int(time.time())))
+    evalDataLoader = DataLoader(EVAL_DATASET, batch_size=BATCH_SIZE, shuffle=False, num_workers=8,
+                                pin_memory=True, drop_last=True)
 
     print("wall", "window", "door", "molding", "other", "terrain", "column", "arch")
-    train_weights = torch.Tensor(train_labelweights).cuda()
+    train_labelweights = TRAIN_DATASET.calculate_labelweights()
 
+    train_weights = torch.Tensor(train_labelweights).cuda()
     log_string("The number of training data is: %d" % len(TRAIN_DATASET))
     log_string("The number of eval data is: %d" % len(EVAL_DATASET))
 
-    print("Length of the training dataset:", len(TRAIN_DATASET))
+    print("Length of the dataset:", len(TRAIN_DATASET))
     print("Length of the trainDataLoader:", len(trainDataLoader))
 
-    print("Length of the evaluation dataset:", len(EVAL_DATASET))
-    print("Length of the evalDataLoader:", len(evalDataLoader))
-    
     '''MODEL LOADING'''
     MODEL = importlib.import_module(args.model)
     shutil.copy('models/%s.py' % args.model, str(experiment_dir))
     shutil.copy('models/pointnet2_utils.py', str(experiment_dir))
 
-    num_extra_features = 0
+    num_extra_features = TRAIN_DATASET.num_extra_features
     print("number = %d" % num_extra_features)
+
     classifier = MODEL.get_model(NUM_CLASSES, num_extra_features).cuda()  # name sensitive but not case sensitive
     criterion = MODEL.get_loss().cuda()
     classifier.apply(inplace_relu)
+
+    def weights_init(m):
+        classname = m.__class__.__name__
+        if classname.find('Conv2d') != -1:
+            torch.nn.init.xavier_normal_(m.weight.data)
+            torch.nn.init.constant_(m.bias.data, 0.0)
+        elif classname.find('Linear') != -1:
+            torch.nn.init.xavier_normal_(m.weight.data)
+            torch.nn.init.constant_(m.bias.data, 0.0)
+
     model_name = args.output_model
 
-
     try:
-        checkpoint = torch.load(str(experiment_dir) + '/checkpoints'+model_name)
+        checkpoint = torch.load(str(experiment_dir) + '/checkpoints' + model_name)
         start_epoch = checkpoint['epoch']
         classifier.load_state_dict(checkpoint['model_state_dict'])
         log_string('Use pretrain model')
     except:
         log_string('No existing model, starting training from scratch...')
         start_epoch = 0
-
-        def weights_init(m):
-            classname = m.__class__.__name__
-            if classname.find('Conv2d') != -1:
-                torch.nn.init.xavier_normal_(m.weight.data)
-                torch.nn.init.constant_(m.bias.data, 0.0)
-            elif classname.find('Linear') != -1:
-                torch.nn.init.xavier_normal_(m.weight.data)
-                torch.nn.init.constant_(m.bias.data, 0.0)
-
         classifier = classifier.apply(weights_init)
 
     if args.optimizer == 'Adam':
-        optimizer = torch.optim.Adam(classifier.parameters(),
+        optimizer = torch.optim.Adam(
+            classifier.parameters(),
             lr=args.learning_rate,
             betas=(0.9, 0.999),
             eps=1e-08,
             weight_decay=args.decay_rate)
     else:
         optimizer = torch.optim.SGD(classifier.parameters(), lr=args.learning_rate, momentum=0.9)
+
+    def bn_momentum_adjust(m, momentum):
+        if isinstance(m, torch.nn.BatchNorm2d) or isinstance(m, torch.nn.BatchNorm1d):
+            m.momentum = momentum
 
     '''Training Model'''
 
@@ -386,13 +472,12 @@ def main(args):
     timePrint(start)
     CurrentTime(timezone)
 
-    accuracyChart = modelTraining(start_epoch, args.epoch, args.learning_rate, args.lr_decay, args.step_size, BATCH_SIZE,
-                                  NUM_POINT, NUM_CLASSES,trainDataLoader, evalDataLoader, classifier, optimizer, criterion,
-                                  train_weights, checkpoints_dir, model_name, seg_label_to_cat, logger)
+    accuracyChart = modelTraining(start_epoch, args.epoch, args.learning_rate, args.lr_decay, args.step_size,
+                                  BATCH_SIZE, NUM_POINT, NUM_CLASSES, trainDataLoader, evalDataLoader, classifier,
+                                  optimizer,
+                                  criterion, train_weights, checkpoints_dir, model_name, seg_label_to_cat, logger)
 
     return accuracyChart
-
-
 
 
 if __name__ == '__main__':
@@ -403,10 +488,9 @@ if __name__ == '__main__':
     max_value = max(accuracyChart)
     max_index = accuracyChart.index(max_value)
 
-    print("Best model = %d"%max_index)
+    print("Best model = %d" % max_index)
     plt.plot(accuracyChart)
     plt.show()
-
 
     timePrint(start)
     CurrentTime(timezone)

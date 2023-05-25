@@ -29,8 +29,6 @@ classes = ["wall", "window",  "door",  "molding", "other", "terrain", "column", 
 NUM_CLASSES = 8
 train_ratio = 0.7
 
-dataColor = True #if data lack color set this to False
-
 ''''''
 
 sys.path.append(os.path.join(BASE_DIR, 'models'))
@@ -76,16 +74,9 @@ class TestCustomDataset():
         self.semantic_labels_list = []
         self.room_coord_min, self.room_coord_max = [], []
         self.labelweights = np.zeros(num_classes)
-        self.num_classes = num_classes
         self.num_extra_features = 0
-        self.extra_features_data = []
+        self.num_classes = num_classes
 
-
-        feature_list=[]
-        if dataColor is True:
-          feature_list=['red','blue','green']
-          self.num_extra_features += 3
-          
         if las_file_list is None:
             return
 
@@ -100,17 +91,6 @@ class TestCustomDataset():
             in_file = laspy.read(file_path)
             points = np.vstack((in_file.x, in_file.y, in_file.z)).T
             labels = np.array(in_file.classification, dtype=np.int32)
-
-            # Retrieve color points
-            tmp_features = []
-            for feature in feature_list:
-                # Retrieve the variable with the same name as the feature from `las_data`
-                feature_value = getattr(las_data, feature)
-                tmp_features.append(feature_value)
-
-            if len(feature_list) > 0:
-                self.extra_features_data.append(tmp_features)
-
 
             # Merge labels as per instructions
             labels[(labels == 5) | (labels == 6)] = 6  # Merge molding and decoration
@@ -149,9 +129,6 @@ class TestCustomDataset():
         grid_y = int(np.ceil(float(coord_max[1] - coord_min[1] - self.block_size) / self.stride) + 1)
         data_room, label_room, sample_weight, index_room = np.array([]), np.array([]), np.array([]),  np.array([])
         
-
-        extra_num = len(self.extra_features_data)
-        
         for index_y in range(grid_y):
             for index_x in range(grid_x):
                 s_x = coord_min[0] + index_x * self.stride
@@ -181,19 +158,6 @@ class TestCustomDataset():
                 label_batch = labels[point_idxs].astype(int)
                 batch_weight = self.labelweights[label_batch]
 
-                #Color features to be included
-                
-                tmp_features = []
-                for ix in  range(extra_num):
-                    features_room = self.extra_features_data[index] # Load the features
-                    features_points = features_room[ix]
-                    selected_feature = features_points[point_idxs]  # num_point * lp_features
-                    tmp_features.append(selected_feature)
-                tmp_np_features = np.array(tmp_features).reshape(-1, 1)
-                
-                data_batch = np.concatenate((data_batch, tmp_np_features,tmp_geo_features), axis=1)
-
-                #Compile the data extracted
                 data_room = np.vstack([data_room, data_batch]) if data_room.size else data_batch
                 label_room = np.hstack([label_room, label_batch]) if label_room.size else label_batch
                 sample_weight = np.hstack([sample_weight, batch_weight]) if label_room.size else batch_weight
@@ -239,8 +203,6 @@ class TestCustomDataset():
         new_dataset.num_classes = self.num_classes
         new_dataset.room_coord_min = self.room_coord_min
         new_dataset.room_coord_max = self.room_coord_max
-        new_dataset.num_extra_features = self.num_extra_features
-        new_dataset.extra_features_data = self.extra_features_data
 
         new_dataset.scene_points_list = [self.scene_points_list[i] for i in new_indices]
         new_dataset.semantic_labels_list = [self.semantic_labels_list[i] for i in new_indices]
@@ -361,14 +323,14 @@ def main(args):
         model_dir = tmp_model
     print(model_dir)
     MODEL = importlib.import_module(model_dir)
-    num_extra_features = TEST_DATASET_WHOLE_SCENE.num_extra_features
+    num_extra_features = 0
     print("number = %d" % num_extra_features)
     classifier = MODEL.get_model(NUM_CLASSES, num_extra_features).cuda()  # name sensitive but not case sensitive
     checkpoint = torch.load(str(experiment_dir) + '/checkpoints'+model_name)
     classifier.load_state_dict(checkpoint['model_state_dict'])
     classifier = classifier.eval()
 
-    num_of_features = 6 + num_extra_features
+    num_of_features = 6
 
     '''Model testing'''
     with torch.no_grad():
