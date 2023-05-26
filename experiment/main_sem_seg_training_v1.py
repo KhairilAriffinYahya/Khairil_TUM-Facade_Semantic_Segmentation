@@ -402,7 +402,7 @@ def main(args):
                 tmp_feature_list.remove('Surface variation')
 
         lidar_dataset = TrainCustomDataset(las_file_list, tmp_feature_list, num_classes=NUM_CLASSES, num_point=NUM_POINT,
-                                           transform=None, class8=args.class8))
+                                           transform=None, class8=args.class8)
         print("Dataset taken")
 
         # Split the dataset into training and evaluation sets
