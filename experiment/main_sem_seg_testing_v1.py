@@ -204,15 +204,18 @@ class TestCustomDataset():
                 batch_weight = self.labelweights[label_batch]
                 
                 # Extra Feature to be included
-                tmp_features = []
-                for ix in  range(extra_num):
-                    features_room = self.extra_features_data[index] # Load the features
-                    features_points = features_room[ix]
-                    selected_feature = features_points[point_idxs]  # num_point * lp_features
-                    tmp_features.append(selected_feature)
-                tmp_np_features = np.array(tmp_features).reshape(-1, 1)
+                if extra_num > 0:
+                    tmp_features = []
+                    tmp_np_features = np.zeros((point_size, extra_num))
+                    for ix in  range(extra_num):
+                        features_room = self.extra_features_data[index] # Load the features
+                        features_points = features_room[ix]
+                        selected_feature = features_points[point_idxs]  # num_point * lp_features
+                        np_feature_array = np.array(selected_feature)
+                        tmp_np_features[:,ix] = np_feature_array
+
+                    data_batch = np.concatenate((data_batch, tmp_np_features), axis=1)
                 
-                data_batch = np.concatenate((data_batch, tmp_np_features), axis=1)
                 
                 #Compile extracted data
                 data_room = np.vstack([data_room, data_batch]) if data_room.size else data_batch
