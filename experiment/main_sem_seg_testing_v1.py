@@ -396,7 +396,7 @@ def main(args):
             if 'Surface variation' in feature_list:
                 tmp_feature_list.remove('Surface variation')
                 
-        TEST_DATASET_WHOLE_SCENE = TestCustomDataset(root, test_file, tmp_feature_list, num_classes=NUM_CLASSES, block_points=NUM_POINT, class8=args.class8))
+        TEST_DATASET_WHOLE_SCENE = TestCustomDataset(root, test_file, tmp_feature_list, num_classes=NUM_CLASSES, block_points=NUM_POINT, class8=args.class8)
 
         if args.calculate_geometry is True:
             print("room_idx test")
