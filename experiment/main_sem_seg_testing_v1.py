@@ -66,7 +66,7 @@ def parse_args():
     parser.add_argument('--extra_features', nargs='+', default=[], help='select which features  to add')
     parser.add_argument('--downsample', type=bool, default=False, help='downsample data')
     parser.add_argument('--calculate_geometry', type=bool, default=False, help='decide where to calculate geometry')
-    parser.add_argument('--class8', type=bool, default=True, help='Select 17 classes or 8 classes data')
+    parser.add_argument('--class8',  default=False, action="store_true", help='Select 17 classes or 8 classes data')
 
     return parser.parse_args()
 
@@ -325,6 +325,8 @@ def main(args):
         logger.info(str)
         print(str)
 
+    print(args.class8)
+    
     '''Initialize'''
     if args.class8 is False:
         classes = classes_18
