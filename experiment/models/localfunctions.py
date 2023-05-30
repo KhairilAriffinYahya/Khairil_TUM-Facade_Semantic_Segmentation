@@ -21,6 +21,32 @@ from datetime import datetime
 from torch.utils.data import Dataset, DataLoader, random_split
 from pathlib import Path
 
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+ROOT_DIR = os.path.dirname(BASE_DIR)
+sys.path.append(BASE_DIR)
+
+g_classes = ["total", "wall", "window",  "door",  "balcony","molding", "deco", "column", "arch", "drainpipe", "stairs",
+           "ground surface", "terrain",  "roof",  "blinds", "outer ceiling surface", "interior", "other"]
+g_class2label = {cls: i for i,cls in enumerate(g_classes)}
+g_class2color = {'total':	[0,255,0],
+                 'wall':	[0,0,255],
+                 'window':	[0,255,255],
+                 'door':        [255,255,0],
+                 'balcony':      [255,0,255],
+                 'molding':      [100,100,255],
+                 'deco':        [200,200,100],
+                 'column':       [170,120,200],
+                 'arch':       [255,0,0],
+                 'drainpipe':        [200,100,100],
+                 'stairs':    [10,200,100],
+                 'ground surface':       [200,200,200],
+                 'terrain':     [50,50,50],
+                 'roof':	[255,100,100],
+                 'blinds':	[100,255,100],
+                 'outer ceiling surface':	[100,155,255],
+                 'interior':	[90,125,255],
+                 'other':	[120,255,120]} 
+g_label2color = {g_classes.index(cls): g_class2color[cls] for cls in g_classes}
 
 
 def timePrint(start):
@@ -259,7 +285,7 @@ def add_vote(vote_label_pool, point_idx, pred_label, weight):
 
 
 def modelTesting(dataset, NUM_CLASSES, NUM_POINT, BATCH_SIZE, args, timezone,
-                 num_of_features, log_string, visual_dir, classifier, seg_label_to_cat):
+                 num_of_features, log_string, visual_dir, classifier, seg_label_to_cat, dataColor):
     scene_id = dataset.file_list
     scene_id = [x[:-4] for x in scene_id]
     num_batches = len(dataset)
@@ -340,11 +366,18 @@ def modelTesting(dataset, NUM_CLASSES, NUM_POINT, BATCH_SIZE, args, timezone,
             pl_save.close()
 
         if args.visual:
-            for i in range(whole_scene_label.shape[0]):
-                fout.write('v %f %f %f\n' % (
-                    whole_scene_data[i, 0], whole_scene_data[i, 1], whole_scene_data[i, 2]))
-                fout_gt.write('v %f %f %f\n' % (
-                    whole_scene_data[i, 0], whole_scene_data[i, 1], whole_scene_data[i, 2]))
+            if dataColor is true:
+                for i in range(whole_scene_label.shape[0]):
+                    color = g_label2color[pred_label[i]]
+                    color_gt = g_label2color[whole_scene_label[i]]
+                    fout.write('v %f %f %f %d %d %d\n' % (whole_scene_data[i, 0], whole_scene_data[i, 1], whole_scene_data[i, 2], color[0], color[1],color[2]))
+                    fout_gt.write('v %f %f %f %d %d %d\n' % (whole_scene_data[i, 0], whole_scene_data[i, 1], whole_scene_data[i, 2], color_gt[0],color_gt[1], color_gt[2]))
+            else:
+                for i in range(whole_scene_label.shape[0]):
+                    fout.write('v %f %f %f\n' % (
+                        whole_scene_data[i, 0], whole_scene_data[i, 1], whole_scene_data[i, 2]))
+                    fout_gt.write('v %f %f %f\n' % (
+                        whole_scene_data[i, 0], whole_scene_data[i, 1], whole_scene_data[i, 2]))
 
         if args.visual:
             fout.close()

@@ -465,7 +465,7 @@ def main(args):
     with torch.no_grad():
         print("Begin testing")
         modelTesting(TEST_DATASET_WHOLE_SCENE, NUM_CLASSES, NUM_POINT, BATCH_SIZE, args, timezone,
-                     num_of_features, log_string, visual_dir, classifier, seg_label_to_cat)
+                     num_of_features, log_string, visual_dir, classifier, seg_label_to_cat, dataColor)
         print("Done!")
 
 if __name__ == '__main__':
