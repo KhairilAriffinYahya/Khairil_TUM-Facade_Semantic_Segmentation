@@ -28,8 +28,8 @@ from geofunction import cal_geofeature
 timezone = pytz.timezone('Asia/Singapore')
 print("Check current time")
 CurrentTime(timezone)
-saveTrain = "geo_traindata.pkl"
-saveEval = "geo_evaldata.pkl"
+saveTrain = "traindataset.pkl"
+saveEval = "evaldataset.pkl"
 saveDir = "/content/Khairil_PN2_experiment/experiment/data/saved_data/"
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 train_ratio = 0.7

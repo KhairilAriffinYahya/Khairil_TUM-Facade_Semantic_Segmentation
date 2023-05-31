@@ -23,7 +23,7 @@ from geofunction import cal_geofeature
 timezone = pytz.timezone('Asia/Singapore')
 print("Check current time")
 CurrentTime(timezone)
-saveTest = "geo_testdata.pkl"
+saveTest = "testdataset.pkl"
 saveDir = "/content/Khairil_PN2_experiment/experiment/data/saved_data/"
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
