@@ -368,7 +368,7 @@ def modelTesting(dataset, NUM_CLASSES, NUM_POINT, BATCH_SIZE, args, timezone,
             pl_save.close()
 
         if args.visual:
-            if dataColor is true:
+            if dataColor is True:
                 for i in range(whole_scene_label.shape[0]):
                     color = g_label2color[pred_label[i]]
                     color_gt = g_label2color[whole_scene_label[i]]
