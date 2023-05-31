@@ -44,7 +44,7 @@ NUM_CLASSES_8 = 8
 def parse_args():
     '''PARAMETERS'''
     parser = argparse.ArgumentParser('Model')
-    parser.add_argument('--model', type=str, default='pointnet2_sem_seg_extra_feature_trial',
+    parser.add_argument('--model', type=str, default='pointnet2_sem_seg',
                         help='model name [default: pointnet_sem_seg]')
     parser.add_argument('--batch_size', type=int, default=32, help='batch size in testing [default: 32]')
     parser.add_argument('--gpu', type=str, default='0', help='specify gpu device')

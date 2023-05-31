@@ -48,7 +48,7 @@ NUM_CLASSES_8 = 8
 # Adjust parameters here if there no changes to reduce line
 def parse_args():
     parser = argparse.ArgumentParser('Model')
-    parser.add_argument('--model', type=str, default='pointnet2_sem_seg_extra_feature_trial',
+    parser.add_argument('--model', type=str, default='pointnet2_sem_seg',
                         help='model name [default: pointnet_sem_seg]')
     parser.add_argument('--batch_size', type=int, default=16, help='Batch Size during training [default: 16]')
     parser.add_argument('--epoch', default=32, type=int, help='Epoch to run [default: 32]')

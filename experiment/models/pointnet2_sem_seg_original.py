@@ -4,9 +4,9 @@ from models.pointnet2_utils import PointNetSetAbstraction,PointNetFeaturePropaga
 
 
 class get_model(nn.Module):
-    def __init__(self, num_classes, num_extra_features):
+    def __init__(self, num_classes):
         super(get_model, self).__init__()
-        self.sa1 = PointNetSetAbstraction(1024, 0.1, 32, 6 + 3 + num_extra_features, [32, 32, 64], False) # Change 9 + 3 to 6 + 3
+        self.sa1 = PointNetSetAbstraction(1024, 0.1, 32, 9 + 3, [32, 32, 64], False)
         self.sa2 = PointNetSetAbstraction(256, 0.2, 32, 64 + 3, [64, 64, 128], False)
         self.sa3 = PointNetSetAbstraction(64, 0.4, 32, 128 + 3, [128, 128, 256], False)
         self.sa4 = PointNetSetAbstraction(16, 0.8, 32, 256 + 3, [256, 256, 512], False)
@@ -38,7 +38,6 @@ class get_model(nn.Module):
         x = F.log_softmax(x, dim=1)
         x = x.permute(0, 2, 1)
         return x, l4_points
-
 
 
 class get_loss(nn.Module):
