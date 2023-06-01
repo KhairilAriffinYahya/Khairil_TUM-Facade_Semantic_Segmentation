@@ -88,6 +88,7 @@ class TestCustomDataset():
         self.labelweights = np.zeros(num_classes)
         self.num_extra_features = 0
         self.num_classes = num_classes
+        self.feature_name = []
 
         # For Extra Features
         self.extra_features_data = []
@@ -110,6 +111,7 @@ class TestCustomDataset():
             
         for feature in feature_list:
             self.num_extra_features += 1
+            self.feature_name.append(feature)
 
 
         for files in self.file_list:
@@ -208,9 +210,12 @@ class TestCustomDataset():
                     tmp_features = []
                     tmp_np_features = np.zeros((point_size, extra_num))
                     for ix in  range(extra_num):
-                        features_room = self.extra_features_data[index] # Load the features
+                        features_room = self.extra_features_data[index] # Load the selected room features
+                        tmp_feature_name = self.feature_name[ix]
                         features_points = features_room[ix]
                         selected_feature = features_points[point_idxs]  # num_point * lp_features
+                        if tmp_feature_name == 'red' or tmp_feature_name == 'blue' or tmp_feature_name == 'green':
+                            selected_feature = selected_feature/255
                         np_feature_array = np.array(selected_feature)
                         tmp_np_features[:,ix] = np_feature_array
 
@@ -465,7 +470,7 @@ def main(args):
     with torch.no_grad():
         print("Begin testing")
         modelTesting(TEST_DATASET_WHOLE_SCENE, NUM_CLASSES, NUM_POINT, BATCH_SIZE, args, timezone,
-                     num_of_features, log_string, visual_dir, classifier, seg_label_to_cat, dataColor)
+                     num_of_features, log_string, visual_dir, classifier, seg_label_to_cat, True)
         print("Done!")
 
 if __name__ == '__main__':

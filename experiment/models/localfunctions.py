@@ -287,7 +287,7 @@ def add_vote(vote_label_pool, point_idx, pred_label, weight):
 
 
 def modelTesting(dataset, NUM_CLASSES, NUM_POINT, BATCH_SIZE, args, timezone,
-                 num_of_features, log_string, visual_dir, classifier, seg_label_to_cat, dataColor):
+                 num_of_features, log_string, visual_dir, classifier, seg_label_to_cat, resultColor):
     scene_id = dataset.file_list
     scene_id = [x[:-4] for x in scene_id]
     num_batches = len(dataset)
@@ -368,7 +368,7 @@ def modelTesting(dataset, NUM_CLASSES, NUM_POINT, BATCH_SIZE, args, timezone,
             pl_save.close()
 
         if args.visual:
-            if dataColor is True:
+            if resultColor is True:
                 for i in range(whole_scene_label.shape[0]):
                     color = g_label2color[pred_label[i]]
                     color_gt = g_label2color[whole_scene_label[i]]

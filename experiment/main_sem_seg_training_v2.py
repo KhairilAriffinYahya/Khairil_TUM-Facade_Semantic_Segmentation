@@ -7,54 +7,48 @@ from pathlib import Path
 import sys
 import importlib
 import shutil
+import pytz
 import numpy as np
 import laspy
 import glob
 import matplotlib.pyplot as plt
 import time
 import pickle
-import pytz
-import open3d as o3d
 import h5py
 import provider
+import open3d as o3d
+from tqdm import tqdm
+from models.localfunctions import timePrint, CurrentTime, inplace_relu, modelTraining
+from collections import Counter
 from torch.utils.data import Dataset, DataLoader, random_split
 from geofunction import cal_geofeature
-from models.localfunctions import timePrint, CurrentTime, inplace_relu, modelTraining
-from tqdm import tqdm
-from collections import Counter
 
 '''Adjust permanent/file/static variables here'''
 
 timezone = pytz.timezone('Asia/Singapore')
 print("Check current time")
 CurrentTime(timezone)
-saveTrain = "geo_traindata.pkl"
-saveEval = "geo_evaldata.pkl"
+saveTrain = "traindataset.pkl"
+saveEval = "evaldataset.pkl"
 saveDir = "/content/Khairil_PN2_experiment/experiment/data/saved_data/"
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-# 0: wall, # 1: window, # 2: door, # 3: molding, # 4: other, # 5: terrain, # 6: column, # 7: arch
-classes = ["wall", "window", "door", "molding", "other", "terrain", "column", "arch"]
-NUM_CLASSES = 8
 train_ratio = 0.7
+dataColor = False #if data lack color set this to False
 
-dataColor = True #if data lack color set this to False
 
-''''''
+classes_18 = ["total", "wall", "window",  "door",  "balcony","molding", "deco", "column", "arch", "drainpipe", "stairs",
+           "ground surface", "terrain",  "roof",  "blinds", "outer ceiling surface", "interior", "other"]
+NUM_CLASSES_18 = 18
 
-sys.path.append(os.path.join(BASE_DIR, 'models'))
-class2label = {cls: i for i, cls in enumerate(classes)}
-seg_classes = class2label
-seg_label_to_cat = {}
-for i, cat in enumerate(seg_classes.keys()):
-    seg_label_to_cat[i] = cat
-
-print(seg_label_to_cat)
+# 0: wall, # 1: window, # 2: door, # 3: molding, # 4: other, # 5: terrain, # 6: column, # 7: arch
+classes_8 = ["wall", "window", "door", "molding", "other", "terrain", "column", "arch"]
+NUM_CLASSES_8 = 8
 
 
 # Adjust parameters here if there no changes to reduce line
 def parse_args():
     parser = argparse.ArgumentParser('Model')
-    parser.add_argument('--model', type=str, default='pointnet2_sem_seg_extra_feature_trial',
+    parser.add_argument('--model', type=str, default='pointnet2_sem_seg',
                         help='model name [default: pointnet_sem_seg]')
     parser.add_argument('--batch_size', type=int, default=16, help='Batch Size during training [default: 16]')
     parser.add_argument('--epoch', default=32, type=int, help='Epoch to run [default: 32]')
@@ -67,40 +61,39 @@ def parse_args():
     parser.add_argument('--npoint', type=int, default=4096, help='Point Number [default: 4096]')
     parser.add_argument('--step_size', type=int, default=10, help='Decay step for lr decay [default: every 10 epochs]')
     parser.add_argument('--lr_decay', type=float, default=0.7, help='Decay rate for lr decay [default: 0.7]')
-    parser.add_argument('--test_area', type=str, default='cc_o_DEBY_LOD2_4959323.las',
-                        help='Which area to use for test, option: 1-6 [default: 5]')
     parser.add_argument('--output_model', type=str, default='/best_model.pth', help='model output name')
+    parser.add_argument('--test_area', type=str, default="cc_o_clipped_Local_DEBY_LOD2_4959323_cc.las",
+                        help='Which area to use for test, option: 1-6 [default: 5]')
     parser.add_argument('--rootdir', type=str,
-                        default='/content/drive/MyDrive/ data/tum/tum-facade/training/cc_selected/',
+                        default="/content/drive/MyDrive/ data/tum/tum-facade/training/cc_selected/CC/",
                         help='directory to data')
     parser.add_argument('--load', type=bool, default=False, help='load saved data or new')
     parser.add_argument('--save', type=bool, default=False, help='save data')
     parser.add_argument('--visualizeModel', type=str, default=False, help='directory to data')
+    parser.add_argument('--extra_features', nargs='+', default=[], help='select which features  to add')
     parser.add_argument('--downsample', type=bool, default=False, help='downsample data')
     parser.add_argument('--calculate_geometry', type=bool, default=False, help='decide where to calculate geometry')
-    parser.add_argument('--geometry_features', type=list, default=['p', 'o', 'c'],
-                        help='select which geometry_features to add')
-
+    parser.add_argument('--class8',  default=False, action="store_true", help='Select 17 classes or 8 classes data')
     return parser.parse_args()
 
 
+''''''
+
 class TrainCustomDataset(Dataset):
-    def __init__(self, las_file_list=None, num_classes=8, num_point=4096, block_size=1.0, sample_rate=1.0,
-                 transform=None, indices=None):
+    def __init__(self, las_file_list=None, feature_list=[], num_classes=8, num_point=4096, block_size=1.0,
+                 sample_rate=1.0, transform=None, indices=None, class8 = True):
         super().__init__()
         self.num_point = num_point
         self.block_size = block_size
         self.transform = transform
         self.num_classes = num_classes
+        self.num_extra_features = 0
         self.room_points, self.room_labels = [], []
         self.room_coord_min, self.room_coord_max = [], []
-        self.num_extra_features = 0
-        self.extra_features_data = []
+        self.feature_name = []
 
-        # For Geometric Features
-        self.lp_data = []
-        self.lo_data = []
-        self.lc_data = []
+        # For Extra Features
+        self.extra_features_data = []
         self.non_index = []
 
         # Return early if las_file_list is None
@@ -120,18 +113,14 @@ class TrainCustomDataset(Dataset):
 
         new_class_mapping = {1: 0, 2: 1, 3: 2, 6: 3, 13: 4, 11: 5, 7: 6, 8: 7}
 
-        feature_list=[]
         if dataColor is True:
-          feature_list=['red','blue','green']
-          for feature in feature_list:
-              self.num_extra_features += 1
+            feature_list.append("red")
+            feature_list.append("blue")
+            feature_list.append("green")
 
-        if 'p' in args.geometry_features:
+        for feature in feature_list:
             self.num_extra_features += 1
-        if 'o' in args.geometry_features:
-            self.num_extra_features += 1
-        if 'c' in args.geometry_features:
-            self.num_extra_features += 1
+            self.feature_name.append(feature)
 
         for room_path in rooms:
             # Read LAS file
@@ -139,36 +128,29 @@ class TrainCustomDataset(Dataset):
             las_data = laspy.read(room_path)
             coords = np.vstack((las_data.x, las_data.y, las_data.z)).transpose()
             labels = np.array(las_data.classification, dtype=np.uint8)
-            if args.calculate_geometry is False:
-                if 'p' in args.geometry_features:
-                    tmp_p = np.array(las_data.planarity, dtype=np.float64)
-                    self.lp_data.append(tmp_p)
-                if 'o' in args.geometry_features:
-                    tmp_o = np.array(las_data.Omnivariance, dtype=np.float64)
-                    self.lo_data.append(tmp_o)
-                if 'c' in args.geometry_features:
-                    tmp_c = np.array(las_data.surface_variation, dtype=np.float64)
-                    self.lc_data.append(tmp_c)
 
+            # Get extra features
             tmp_features = []
             for feature in feature_list:
                 # Retrieve the variable with the same name as the feature from `las_data`
                 feature_value = getattr(las_data, feature)
                 tmp_features.append(feature_value)
 
-            if len(feature_list) > 0:
+            if self.num_extra_features > 0:
                 self.extra_features_data.append(tmp_features)
 
-            # Merge labels as per instructions
-            labels[(labels == 5) | (labels == 6)] = 6  # Merge molding and decoration
-            labels[(labels == 1) | (labels == 9) | (labels == 15) | (
+            # Reduce number of labels
+            if class8 is True:
+                # Merge labels as per instructions
+                labels[(labels == 5) | (labels == 6)] = 6  # Merge molding and decoration
+                labels[(labels == 1) | (labels == 9) | (labels == 15) | (
                         labels == 10)] = 1  # Merge wall, drainpipe, outer ceiling surface, and stairs
-            labels[(labels == 12) | (labels == 11)] = 11  # Merge terrain and ground surface
-            labels[(labels == 13) | (labels == 16) | (labels == 17)] = 13  # Merge interior, roof, and other
-            labels[labels == 14] = 2  # Add blinds to window
+                labels[(labels == 12) | (labels == 11)] = 11  # Merge terrain and ground surface
+                labels[(labels == 13) | (labels == 16) | (labels == 17)] = 13  # Merge interior, roof, and other
+                labels[labels == 14] = 2  # Add blinds to window
 
-            # Map merged labels to new labels (0 to 7)
-            labels = np.vectorize(new_class_mapping.get)(labels)
+                # Map merged labels to new labels (0 to 7)
+                labels = np.vectorize(new_class_mapping.get)(labels)
 
             room_data = np.concatenate((coords, labels[:, np.newaxis]), axis=1)  # xyzl, N*4
             points, labels = room_data[:, 0:3], room_data[:, 3]  # xyz, N*3; l, N
@@ -181,6 +163,7 @@ class TrainCustomDataset(Dataset):
             self.room_coord_max.append(coord_max)
             num_point_all.append(labels.size)
 
+
         sample_prob = num_point_all / np.sum(num_point_all)
         num_iter = int(np.sum(num_point_all) * sample_rate / num_point)
         room_idxs = []
@@ -192,6 +175,7 @@ class TrainCustomDataset(Dataset):
         if indices is not None:
             self.room_idxs = self.room_idxs[indices]
 
+
         print("Extra features to be included = %d" % self.num_extra_features)
         print("Totally {} samples in dataset.".format(len(self.room_idxs)))
 
@@ -200,7 +184,6 @@ class TrainCustomDataset(Dataset):
         points = self.room_points[room_idx]  # N * 6
         labels = self.room_labels[room_idx]  # N
         N_points = points.shape[0]
-
         extra_num = self.num_extra_features
 
         while (True):
@@ -210,7 +193,7 @@ class TrainCustomDataset(Dataset):
             point_idxs = np.where((points[:, 0] >= block_min[0]) & (points[:, 0] <= block_max[0]) & (points[:, 1]
                                                                                                      >= block_min[
                                                                                                          1]) & (
-                                              points[:, 1] <= block_max[1]))[0]
+                                          points[:, 1] <= block_max[1]))[0]
             if point_idxs.size > 1024:
                 break
 
@@ -229,50 +212,30 @@ class TrainCustomDataset(Dataset):
         selected_points[:, 1] = selected_points[:, 1] - center[1]
         current_points[:, 0:3] = selected_points
 
-
-        #Extra Features to be included
+        # Extra feature to be added
         num_of_features = current_points.shape[1]
         current_features = current_points
-      
-        ex_features = []
-        if 'p' in args.geometry_features:
-            lp_room = self.lp_data[room_idx]
-            selected_lp = lp_room[selected_point_idxs]  # num_point * lp_features
-            ex_features.append(selected_lp)
-            num_of_features += 1
-            extra_num -=1
-        if 'o' in args.geometry_features:
-            lo_room = self.lo_data[room_idx]
-            selected_lo = lo_room[selected_point_idxs]  # num_point * lo_features
-            ex_features.append(selected_lo)
-            num_of_features += 1
-            extra_num -=1
-        if 'c' in args.geometry_features:
-            lc_room = self.lc_data[room_idx]
-            selected_lc = lc_room[selected_point_idxs]  # num_point * lc_features
-            ex_features.append(selected_lc)
-            num_of_features += 1
-            extra_num -=1
 
+        ex_features = []
         for ix in range(extra_num):
-            features_room = self.extra_features_data[room_idx]
+            features_room = self.extra_features_data[index] # Load the selected room features
+            tmp_feature_name = self.feature_name[ix]
             features_points = features_room[ix]
-            selected_feature = features_points[selected_point_idxs]  # num_point * lp_features
+            selected_feature = features_points[point_idxs]  # num_point * lp_features
+            if tmp_feature_name == 'red' or tmp_feature_name == 'blue' or tmp_feature_name == 'green':
+                selected_feature = selected_feature/255
             ex_features.append(selected_feature)
             num_of_features += 1
-
 
         tmp_np_features = np.zeros((self.num_point, num_of_features))
         tmp_np_features[:, 0:current_points.shape[1]] = current_features
         features_loop = num_of_features - current_points.shape[1]
-        
-
         for i in range(features_loop):
             col_pointer = i + current_points.shape[1]
             tmp_np_features[:, col_pointer] = ex_features[i]
-            
         current_features = tmp_np_features
-        current_labels = labels[selected_point_idxs] 
+
+        current_labels = labels[selected_point_idxs]
         if self.transform is not None:
             current_features, current_labels = self.transform(current_features, current_labels)
 
@@ -281,7 +244,7 @@ class TrainCustomDataset(Dataset):
     def __len__(self):
         return len(self.room_idxs)
 
-    def calculate_labelweights(self):
+    def calculate_labelweights(self):  # calculate weight of each label/class
         print("Calculate Weights")
         labelweights = np.zeros(self.num_classes)
         for labels in self.room_labels:
@@ -297,16 +260,17 @@ class TrainCustomDataset(Dataset):
 
         return labelweights
 
-    def filtered_indices(self):
+    def filtered_indices(self):  # get new index list
         total_indices = set(range(len(self.room_points)))
         non_index_set = set(self.non_index)
         filtered_indices = list(total_indices - non_index_set)
         return filtered_indices
 
-    def index_update(self, newIndices):
+    def index_update(self, newIndices):  # adjust index
         self.room_idxs = newIndices
 
     def copy(self, indices=None):
+        # COPY EVERYTHING EXCEPT FOR INDEX
         copied_dataset = TrainCustomDataset()
         copied_dataset.num_point = self.num_point
         copied_dataset.block_size = self.block_size
@@ -319,14 +283,11 @@ class TrainCustomDataset(Dataset):
         copied_dataset.num_extra_features = self.num_extra_features
         copied_dataset.extra_features_data = self.extra_features_data
 
+        # Index to be adjusted
         if indices is not None:
             copied_dataset.room_idxs = self.room_idxs[indices]
         else:
             copied_dataset.room_idxs = self.room_idxs.copy()
-
-        copied_dataset.lp_data = self.lp_data
-        copied_dataset.lo_data = self.lo_data
-        copied_dataset.lc_data = self.lc_data
 
         print("Totally {} samples in dataset.".format(len(copied_dataset.room_idxs)))
         return copied_dataset
@@ -341,7 +302,7 @@ class TrainCustomDataset(Dataset):
             dataset = pickle.load(f)
 
         print("Extra features to be included = %d" % dataset.num_extra_features)
-        print("Number of Classes in dataset = %d" %dataset.num_classes)
+        print("Number of Classes in dataset = %d" % dataset.num_classes)
         print("Totally {} samples in dataset.".format(len(dataset.room_idxs)))
         return dataset
 
@@ -352,11 +313,37 @@ def main(args):
         print(str)
 
     '''Initialize Variables'''
+
+    if args.class8 is False:
+        classes = classes_18
+        NUM_CLASSES = NUM_CLASSES_18
+    else:
+        classes = classes_8
+        NUM_CLASSES = NUM_CLASSES_8
+
+    sys.path.append(os.path.join(BASE_DIR, 'models'))
+    class2label = {cls: i for i, cls in enumerate(classes)}
+    seg_classes = class2label
+    seg_label_to_cat = {}
+    for i, cat in enumerate(seg_classes.keys()):
+        seg_label_to_cat[i] = cat
+    print(seg_label_to_cat)
+
+
     root = args.rootdir
     NUM_POINT = args.npoint
     BATCH_SIZE = args.batch_size
     las_file_list = [file for file in glob.glob(root + '/*.las') if not file.endswith(args.test_area)]
     print("Number of Classes = %d" %NUM_CLASSES)
+
+    feature_list = []
+    for feature in args.extra_features:
+        feature_list.append(feature)
+    if len(feature_list) > 0:
+        print("Extra features to be added")
+        print(feature_list)
+    else:
+        print("No extra features")
 
     '''HYPER PARAMETER'''
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
@@ -403,12 +390,23 @@ def main(args):
         for dimension in in_file.point_format:
             print(dimension.name)
 
-
     '''Load Dataset'''
     loadtime = time.time()
 
     if args.load is False:
-        lidar_dataset = TrainCustomDataset(las_file_list, num_classes=NUM_CLASSES, num_point=NUM_POINT, transform=None)
+
+        tmp_feature_list = feature_list
+        
+        if args.calculate_geometry is True:
+            if 'Planarity' in feature_list:
+                tmp_feature_list.remove('Planarity')
+            if 'Omnivariance' in feature_list:
+                tmp_feature_list.remove('Omnivariance')
+            if 'Surface variation' in feature_list:
+                tmp_feature_list.remove('Surface variation')
+
+        lidar_dataset = TrainCustomDataset(las_file_list, tmp_feature_list, num_classes=NUM_CLASSES, num_point=NUM_POINT,
+                                           transform=None, class8=args.class8)
         print("Dataset taken")
 
         # Split the dataset into training and evaluation sets
@@ -426,22 +424,58 @@ def main(args):
             calTime = time.time()
             print("room_idx training")
             print(len(TRAIN_DATASET.room_idxs))
-            cal_geofeature(TRAIN_DATASET, args.downsample, args.visualizeModel)
+            lp, lo, lc, non_index = cal_geofeature(TRAIN_DATASET, args.downsample, args.visualizeModel)
+                        
+            # Store the additional features in the CustomDataset instance
+            if 'Planarity' in feature_list:
+                TRAIN_DATASET.extra_features_data.append(lp)
+                TRAIN_DATASET.num_extra_features+=1
+            if 'Omnivariance' in feature_list:
+                TRAIN_DATASET.extra_features_data.append(lo)
+                TRAIN_DATASET.num_extra_features+=1
+            if 'Surface variation' in feature_list:
+                TRAIN_DATASET.extra_features_data.append(lc)
+                TRAIN_DATASET.num_extra_features+=1
+            
+            TRAIN_DATASET.non_index = non_index
+            # Filter the points and labels using the non_index variable
+            if len(non_index) != 0:
+                filtered_indices = TRAIN_DATASET.filtered_indices()
+                TRAIN_DATASET.filtered_update(filtered_indices)             
+                       
             print("geometric room_idx training")
             print(TRAIN_DATASET.room_idxs)
             print(len(TRAIN_DATASET.room_idxs))
 
             print("room_idx evaluation")
             print(len(EVAL_DATASET.room_idxs))
-            add_geofeature(EVAL_DATASET, args.downsample, args.visualizeModel)
+            lp, lo, lc, non_index = cal_geofeature(EVAL_DATASET, args.downsample, args.visualizeModel)
+            
+            # Store the additional features in the CustomDataset instance
+            if 'Planarity' in feature_list:
+                EVAL_DATASET.extra_features_data.append(lp)
+                EVAL_DATASET.num_extra_features+=1
+            if 'Omnivariance' in feature_list:
+                EVAL_DATASET.extra_features_data.append(lo)
+                EVAL_DATASET.num_extra_features+=1
+            if 'Surface variation' in feature_list:
+                EVAL_DATASET.extra_features_data.append(lc)
+                EVAL_DATASET.num_extra_features+=1
+            
+            EVAL_DATASET.non_index = non_index
+            # Filter the points and labels using the non_index variable
+            if len(non_index) != 0:
+                filtered_indices = EVAL_DATASET.filtered_indices()
+                EVAL_DATASET.filtered_update(filtered_indices)  
+                
             print("geometric room_idx evaluation")
+            
             print(len(EVAL_DATASET))
             timePrint(start)
             CurrentTime(timezone)
 
             timePrint(calTime)
             CurrentTime(timezone)
-
 
     else:
         print("Load previously saved dataset")
@@ -516,8 +550,7 @@ def main(args):
             lr=args.learning_rate,
             betas=(0.9, 0.999),
             eps=1e-08,
-            weight_decay=args.decay_rate
-        )
+            weight_decay=args.decay_rate)
     else:
         optimizer = torch.optim.SGD(classifier.parameters(), lr=args.learning_rate, momentum=0.9)
 
@@ -535,8 +568,9 @@ def main(args):
     CurrentTime(timezone)
 
     accuracyChart = modelTraining(start_epoch, args.epoch, args.learning_rate, args.lr_decay, args.step_size,
-                                  BATCH_SIZE,NUM_POINT, NUM_CLASSES, trainDataLoader, evalDataLoader, classifier, optimizer,
-                                  criterion,train_weights, checkpoints_dir, model_name, seg_label_to_cat, logger)
+                                  BATCH_SIZE, NUM_POINT, NUM_CLASSES, trainDataLoader, evalDataLoader, classifier,
+                                  optimizer, criterion, train_weights, checkpoints_dir, model_name, seg_label_to_cat,
+                                  logger)
 
     return accuracyChart
 
@@ -549,10 +583,9 @@ if __name__ == '__main__':
     max_value = max(accuracyChart)
     max_index = accuracyChart.index(max_value)
 
-    print("Best model = %d"%max_index)
+    print("Best model = %d" % max_index)
     plt.plot(accuracyChart)
     plt.show()
-
 
     timePrint(start)
     CurrentTime(timezone)
