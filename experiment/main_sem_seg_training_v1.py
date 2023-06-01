@@ -218,10 +218,10 @@ class TrainCustomDataset(Dataset):
 
         ex_features = []
         for ix in range(extra_num):
-            features_room = self.extra_features_data[index] # Load the selected room features
             tmp_feature_name = self.feature_name[ix]
+            features_room = self.extra_features_data[room_idx]
             features_points = features_room[ix]
-            selected_feature = features_points[point_idxs]  # num_point * lp_features
+            selected_feature = features_points[selected_point_idxs]  # num_point * lp_features
             if tmp_feature_name == 'red' or tmp_feature_name == 'blue' or tmp_feature_name == 'green':
                 selected_feature = selected_feature/255
             ex_features.append(selected_feature)
