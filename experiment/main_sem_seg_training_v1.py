@@ -282,6 +282,7 @@ class TrainCustomDataset(Dataset):
         copied_dataset.room_coord_max = self.room_coord_max.copy()
         copied_dataset.num_extra_features = self.num_extra_features
         copied_dataset.extra_features_data = self.extra_features_data
+        copied_dataset.feature_name = self.feature_name
 
         # Index to be adjusted
         if indices is not None:
