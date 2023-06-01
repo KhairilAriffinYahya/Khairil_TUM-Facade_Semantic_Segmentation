@@ -30,24 +30,24 @@ sys.path.append(BASE_DIR)
 g_classes = ["total", "wall", "window",  "door",  "balcony","molding", "deco", "column", "arch", "drainpipe", "stairs",
            "ground surface", "terrain",  "roof",  "blinds", "outer ceiling surface", "interior", "other"]
 g_class2label = {cls: i for i,cls in enumerate(g_classes)}
-g_class2color = {'total':	[0,255,0],
-                 'wall':	[0,0,255],
-                 'window':	[0,255,255],
-                 'door':        [255,255,0],
+g_class2color = {'total':	[0,0,0],
+                 'wall':	[100,0,100],
+                 'window':	[0,255,150],
+                 'door':        [0,255,0],
                  'balcony':      [255,0,255],
                  'molding':      [100,100,255],
                  'deco':        [200,200,100],
-                 'column':       [170,120,200],
+                 'column':       [170,120,170],
                  'arch':       [255,0,0],
                  'drainpipe':        [200,100,100],
                  'stairs':    [10,200,100],
-                 'ground surface':       [200,200,200],
+                 'ground surface':       [0,0,255],
                  'terrain':     [50,50,50],
                  'roof':	[255,100,100],
                  'blinds':	[100,255,100],
-                 'outer ceiling surface':	[100,155,255],
+                 'outer ceiling surface':	[100,155,10],
                  'interior':	[90,125,255],
-                 'other':	[120,255,120]} 
+                 'other':	[70,50,70]} 
 g_label2color = {g_classes.index(cls): g_class2color[cls] for cls in g_classes}
 
 
