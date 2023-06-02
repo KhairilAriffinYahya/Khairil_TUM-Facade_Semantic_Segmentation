@@ -129,6 +129,13 @@ class TrainCustomDataset(Dataset):
             coords = np.vstack((las_data.x, las_data.y, las_data.z)).transpose()
             labels = np.array(las_data.classification, dtype=np.uint8)
 
+            # Find available properties
+            # available_properties = las_data.point_format.dimension_names
+            # print("Available properties:")
+            # for prop in available_properties:
+                # print(prop)
+
+
             # Get extra features
             tmp_features = []
             for feature in feature_list:
