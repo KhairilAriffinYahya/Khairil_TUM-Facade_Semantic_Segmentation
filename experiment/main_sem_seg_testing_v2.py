@@ -278,6 +278,7 @@ class TestCustomDataset():
         new_dataset.non_index = self.non_index
         new_dataset.num_extra_features = self.num_extra_features
         new_dataset.extra_features_data = self.extra_features_data
+        new_dataset.feature_name = self.feature_name
 
         new_dataset.scene_points_list = [self.scene_points_list[i] for i in new_indices]
         new_dataset.semantic_labels_list = [self.semantic_labels_list[i] for i in new_indices]

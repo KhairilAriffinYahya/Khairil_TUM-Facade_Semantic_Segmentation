@@ -129,6 +129,13 @@ class TrainCustomDataset(Dataset):
             coords = np.vstack((las_data.x, las_data.y, las_data.z)).transpose()
             labels = np.array(las_data.classification, dtype=np.uint8)
 
+            # Find available properties
+            # available_properties = las_data.point_format.dimension_names
+            # print("Available properties:")
+            # for prop in available_properties:
+                # print(prop)
+
+
             # Get extra features
             tmp_features = []
             for feature in feature_list:
@@ -218,10 +225,10 @@ class TrainCustomDataset(Dataset):
 
         ex_features = []
         for ix in range(extra_num):
-            features_room = self.extra_features_data[index] # Load the selected room features
             tmp_feature_name = self.feature_name[ix]
+            features_room = self.extra_features_data[room_idx]
             features_points = features_room[ix]
-            selected_feature = features_points[point_idxs]  # num_point * lp_features
+            selected_feature = features_points[selected_point_idxs]  # num_point * lp_features
             if tmp_feature_name == 'red' or tmp_feature_name == 'blue' or tmp_feature_name == 'green':
                 selected_feature = selected_feature/255
             ex_features.append(selected_feature)
@@ -282,6 +289,7 @@ class TrainCustomDataset(Dataset):
         copied_dataset.room_coord_max = self.room_coord_max.copy()
         copied_dataset.num_extra_features = self.num_extra_features
         copied_dataset.extra_features_data = self.extra_features_data
+        copied_dataset.feature_name = self.feature_name
 
         # Index to be adjusted
         if indices is not None:
