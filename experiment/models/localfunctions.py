@@ -26,28 +26,44 @@ ROOT_DIR = os.path.dirname(BASE_DIR)
 sys.path.append(BASE_DIR)
 
 #classes_8 = ["wall", "window", "door", "molding", "other", "terrain", "column", "arch"]
+'''
+g_class2color = {'ceiling':	[0,255,0],
+                 'floor':	[0,0,255],
+                 'wall':	[0,255,255],
+                 'beam':        [255,255,0],
+                 'column':      [255,0,255],
+                 'window':      [100,100,255],
+                 'door':        [200,200,100],
+                 'table':       [170,120,200],
+                 'chair':       [255,0,0],
+                 'sofa':        [200,100,100],
+                 'bookcase':    [10,200,100],
+                 'board':       [200,200,200],
+                 'clutter':     [50,50,50]} 
+'''
+
 
 g_classes = ["total", "wall", "window",  "door",  "balcony","molding", "deco", "column", "arch", "drainpipe", "stairs",
            "ground surface", "terrain",  "roof",  "blinds", "outer ceiling surface", "interior", "other"]
 g_class2label = {cls: i for i,cls in enumerate(g_classes)}
-g_class2color = {'total':	[0,0,0],
-                 'wall':	[100,0,100],
-                 'window':	[0,255,150],
-                 'door':        [0,255,0],
-                 'balcony':      [255,0,255],
-                 'molding':      [100,100,255],
-                 'deco':        [200,200,100],
-                 'column':       [170,120,170],
-                 'arch':       [255,0,0],
-                 'drainpipe':        [200,100,100],
-                 'stairs':    [10,200,100],
-                 'ground surface':       [0,0,255],
-                 'terrain':     [50,50,50],
-                 'roof':	[255,100,100],
-                 'blinds':	[100,255,100],
-                 'outer ceiling surface':	[100,155,10],
-                 'interior':	[90,125,255],
-                 'other':	[70,50,70]} 
+g_class2color = {'total':	                [0,0,0],
+                 'wall':	                [0,255,0],
+                 'window':	              [0,0,255],
+                 'door':                  [0,255,255],
+                 'molding':               [255,255,0],
+                 'other':	                [255,0,255],
+                 'terrain':               [100,100,255], 
+                 'column':                [200,200,100],
+                 'arch':                  [170,120,200],
+                 'balcony':               [255,0,0],
+                 'deco':                  [0,0,150],
+                 'drainpipe':             [20,70,0],
+                 'stairs':                [70,50,70],
+                 'ground surface':        [50,50,50],
+                 'roof':	                [10,20,10],
+                 'blinds':	              [100,255,100],
+                 'outer ceiling surface':	[200,100,100],
+                 'interior':	            [50,50,50]}
 g_label2color = {g_classes.index(cls): g_class2color[cls] for cls in g_classes}
 
 
