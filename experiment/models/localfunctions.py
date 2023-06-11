@@ -437,9 +437,10 @@ def modelTesting(dataset, NUM_CLASSES, NUM_POINT, BATCH_SIZE, args, timezone,
             tmp = 0
         else:
             tmp = total_correct_class[l] / float(total_iou_deno_class[l])
-                  iou_per_class_str += 'class %s, IoU: %.3f \n' % (
-                  seg_label_to_cat[l] + ' ' * (14 - len(seg_label_to_cat[l])), tmp)
-
+            iou_per_class_str += 'class %s, IoU: %.3f \n' % (
+                                  seg_label_to_cat[l] + ' ' * 
+                                  (14 - len(seg_label_to_cat[l])), tmp)
+                                  
     # Logging results
     log_string(iou_per_class_str)
     log_string('eval point avg class IoU: %f' % np.mean(IoU))
