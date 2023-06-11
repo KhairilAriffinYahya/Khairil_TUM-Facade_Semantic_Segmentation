@@ -26,26 +26,25 @@ ROOT_DIR = os.path.dirname(BASE_DIR)
 sys.path.append(BASE_DIR)
 
 #classes_8 = ["wall", "window", "door", "molding", "other", "terrain", "column", "arch"]
-'''
-g_class2color = {'ceiling':	[0,255,0],
-                 'floor':	[0,0,255],
-                 'wall':	[0,255,255],
-                 'beam':        [255,255,0],
-                 'column':      [255,0,255],
-                 'window':      [100,100,255],
-                 'door':        [200,200,100],
-                 'table':       [170,120,200],
-                 'chair':       [255,0,0],
-                 'sofa':        [200,100,100],
-                 'bookcase':    [10,200,100],
-                 'board':       [200,200,200],
-                 'clutter':     [50,50,50]} 
-'''
-
-
-g_classes = ["total", "wall", "window",  "door",  "balcony","molding", "deco", "column", "arch", "drainpipe", "stairs",
-           "ground surface", "terrain",  "roof",  "blinds", "outer ceiling surface", "interior", "other"]
-g_class2label = {cls: i for i,cls in enumerate(g_classes)}
+'''              
+                 #eggshell	#FCE6C9	RGB(252,230,201) wall
+                 #cornflowerblue	#6495ED	RGB(100,149,237) window
+                 #cadmiumorange	#FF6103	RGB(255,97,3) door
+                 #teal	#008080	RGB(0,128,128) balcony
+                 #blueviolet	#8A2BE2	RGB(138,43,226) molding
+                 #cyan2	#00EEEE	RGB(0,238,238) deco
+                 #red1	#FF0000	RGB(255,0,0) column
+                 #cobalt	#3D59AB	RGB(61,89,171) arch
+                 #orange1	#FFA500	RGB(255,165,0) drainpipe
+                 #rosybrown	#BC8F8F	RGB(188,143,143) stairs
+                 #lawngreen	#7CFC00	RGB(124,252,0) ground surface
+                 #mint	#BDFCC9	RGB(189,252,201) terrain
+                 #firebrick4	#8B1A1A	RGB(139,26,26) roof
+                 #alegreen4	#548B54	RGB(84,139,84) blinds
+                 #darkgoldenrod	#B8860B	RGB(184,134,11) outer ceiling surface
+                 #yellow1	#FFFF00	RGB(255,255,0) interior
+                 #dimgray	#696969	RGB(105,105,105) other
+                 
 g_class2color = {'total':	                [0,0,0],
                  'wall':	                [0,255,0],
                  'window':	              [0,0,255],
@@ -63,7 +62,31 @@ g_class2color = {'total':	                [0,0,0],
                  'roof':	                [10,20,10],
                  'blinds':	              [100,255,100],
                  'outer ceiling surface':	[200,100,100],
-                 'interior':	            [50,50,50]}
+                 'interior':	            [50,50,50]}       
+'''
+
+
+g_classes = ["total", "wall", "window",  "door",  "balcony","molding", "deco", "column", "arch", "drainpipe", "stairs",
+           "ground surface", "terrain",  "roof",  "blinds", "outer ceiling surface", "interior", "other"]
+g_class2label = {cls: i for i,cls in enumerate(g_classes)}
+g_class2color = {'total':	                [0,0,0],
+                 'wall':	                [252,230,201],    #eggshell	#FCE6C9	RGB(252,230,201) wall
+                 'window':	              [100,149,237],    #cornflowerblue	#6495ED	RGB(100,149,237) window
+                 'door':                  [255,97,3],       #cadmiumorange	#FF6103	RGB(255,97,3) door
+                 'molding':               [138,43,226],     #blueviolet	#8A2BE2	RGB(138,43,226) molding
+                 'other':	                [105,105,105],    #dimgray	#696969	RGB(105,105,105) other
+                 'terrain':               [189,252,201],    #mint	#BDFCC9	RGB(189,252,201) terrain
+                 'column':                [255,0,0],        #red1	#FF0000	RGB(255,0,0) column
+                 'arch':                  [61,89,171],      #cobalt	#3D59AB	RGB(61,89,171) arch
+                 'balcony':               [0,128,128],      #teal	#008080	RGB(0,128,128) balcony
+                 'deco':                  [0,238,238],      #cyan2	#00EEEE	RGB(0,238,238) deco
+                 'drainpipe':             [255,165,0],      #orange1	#FFA500	RGB(255,165,0) drainpipe
+                 'stairs':                [188,143,143],    #rosybrown	#BC8F8F	RGB(188,143,143) stairs
+                 'ground surface':        [124,252,0],      #lawngreen	#7CFC00	RGB(124,252,0) ground surface
+                 'roof':	                [139,26,26],      #firebrick4	#8B1A1A	RGB(139,26,26) roof
+                 'blinds':	              [84,139,84],      #alegreen4	#548B54	RGB(84,139,84) blinds
+                 'outer ceiling surface':	[184,134,11],     #darkgoldenrod	#B8860B	RGB(184,134,11) outer ceiling surface
+                 'interior':	            [255,255,0]}      #yellow1	#FFFF00	RGB(255,255,0) interior
 g_label2color = {g_classes.index(cls): g_class2color[cls] for cls in g_classes}
 
 
@@ -414,8 +437,8 @@ def modelTesting(dataset, NUM_CLASSES, NUM_POINT, BATCH_SIZE, args, timezone,
             tmp = 0
         else:
             tmp = total_correct_class[l] / float(total_iou_deno_class[l])
-        iou_per_class_str += 'class %s, IoU: %.3f \n' % (
-            seg_label_to_cat[l] + ' ' * (14 - len(seg_label_to_cat[l])), tmp)
+                  iou_per_class_str += 'class %s, IoU: %.3f \n' % (
+                  seg_label_to_cat[l] + ' ' * (14 - len(seg_label_to_cat[l])), tmp)
 
     # Logging results
     log_string(iou_per_class_str)
