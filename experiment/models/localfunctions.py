@@ -69,7 +69,7 @@ g_class2color = {'total':	                [0,0,0],
 g_classes = ["total", "wall", "window",  "door",  "balcony","molding", "deco", "column", "arch", "drainpipe", "stairs",
            "ground surface", "terrain",  "roof",  "blinds", "outer ceiling surface", "interior", "other"]
 g_class2label = {cls: i for i,cls in enumerate(g_classes)}
-g_class2color = {'total':	                [0,0,0],
+g_class2color = {'total':	                [255,239,213],    #papayawhip	#FFEFD5	RGB(255,239,213)
                  'wall':	                [252,230,201],    #eggshell	#FCE6C9	RGB(252,230,201) wall
                  'window':	              [100,149,237],    #cornflowerblue	#6495ED	RGB(100,149,237) window
                  'door':                  [255,97,3],       #cadmiumorange	#FF6103	RGB(255,97,3) door
@@ -411,6 +411,9 @@ def modelTesting(dataset, NUM_CLASSES, NUM_POINT, BATCH_SIZE, args, timezone,
                 for i in range(whole_scene_label.shape[0]):
                     color = g_label2color[pred_label[i]]
                     color_gt = g_label2color[whole_scene_label[i]]
+                    print("Pred part: " + pred_label[i])
+                    print("Color = ")
+                    print(color)
                     fout.write('v %f %f %f %d %d %d\n' % 
                               (whole_scene_data[i, 0], whole_scene_data[i, 1], whole_scene_data[i, 2], 
                                color[0], color[1],color[2]))
@@ -444,7 +447,5 @@ def modelTesting(dataset, NUM_CLASSES, NUM_POINT, BATCH_SIZE, args, timezone,
     # Logging results
     log_string(iou_per_class_str)
     log_string('eval point avg class IoU: %f' % np.mean(IoU))
-    log_string('eval whole scene point avg class acc: %f' % (
-        np.mean(np.array(total_correct_class) / (np.array(total_seen_class, dtype=np.float64) + 1e-6))))
-    log_string('eval whole scene point accuracy: %f' % (
-            np.sum(total_correct_class) / float(np.sum(total_seen_class) + 1e-6)))
+    log_string('eval whole scene point avg class acc: %f' % (np.mean(np.array(total_correct_class) / (np.array(total_seen_class, dtype=np.float64) + 1e-6))))
+    log_string('eval whole scene point accuracy: %f' %      (np.sum(total_correct_class) / float(np.sum(total_seen_class) + 1e-6)))
