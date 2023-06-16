@@ -411,7 +411,8 @@ def modelTesting(dataset, NUM_CLASSES, NUM_POINT, BATCH_SIZE, args, timezone,
                 for i in range(whole_scene_label.shape[0]):
                     color = g_label2color[pred_label[i]]
                     color_gt = g_label2color[whole_scene_label[i]]
-                    print("Pred part: " + pred_label[i])
+                    print("Pred part: %d" %pred_label[i])
+                    print(type(color))
                     print("Color = ")
                     print(color)
                     fout.write('v %f %f %f %d %d %d\n' % 
