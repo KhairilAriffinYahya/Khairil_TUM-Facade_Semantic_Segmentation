@@ -70,7 +70,7 @@ g_classes = ["total", "wall", "window",  "door",  "balcony","molding", "deco", "
            "ground surface", "terrain",  "roof",  "blinds", "outer ceiling surface", "interior", "other"]
 g_class2label = {cls: i for i,cls in enumerate(g_classes)}
 g_class2color = {'total':	                [255,239,213],    #papayawhip	#FFEFD5	RGB(255,239,213)
-                 'wall':	                [252,230,201],    #eggshell	#FCE6C9	RGB(252,230,201) wall
+                 'wall':	                [25,23,20],    #eggshell	#FCE6C9	RGB(252,230,201) wall
                  'window':	              [100,149,237],    #cornflowerblue	#6495ED	RGB(100,149,237) window
                  'door':                  [255,97,3],       #cadmiumorange	#FF6103	RGB(255,97,3) door
                  'molding':               [138,43,226],     #blueviolet	#8A2BE2	RGB(138,43,226) molding
@@ -89,7 +89,7 @@ g_class2color = {'total':	                [255,239,213],    #papayawhip	#FFEFD5	
                  'interior':	            [255,255,0]}      #yellow1	#FFFF00	RGB(255,255,0) interior
 g_label2color = {g_classes.index(cls): g_class2color[cls] for cls in g_classes}
 
-g_colorNames     = {'total':	                'papayawhip',         #papayawhip	#FFEFD5	RGB(255,239,213)
+g_colorNames  = {'total':	                'papayawhip',         #papayawhip	#FFEFD5	RGB(255,239,213)
                  'wall':	                'eggshell',           #eggshell	#FCE6C9	RGB(252,230,201) wall
                  'window':	              'cornflowerblue',     #cornflowerblue	#6495ED	RGB(100,149,237) window
                  'door':                  'cadmiumorange',      #cadmiumorange	#FF6103	RGB(255,97,3) door
