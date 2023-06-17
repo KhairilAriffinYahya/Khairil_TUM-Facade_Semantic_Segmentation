@@ -580,19 +580,21 @@ def main(args):
                                         optimizer, criterion, train_weights, checkpoints_dir, model_name, seg_label_to_cat,
                                         logger)
 
-    return accuracyChart
+    return accuracyChart, MLChart, IoUChart
 
 
 if __name__ == '__main__':
     args = parse_args()
     start = time.time()
-    accuracyChart = main(args)
+    accuracyChart, MLChart, IoUChart = main(args)
 
     max_value = max(accuracyChart)
     max_index = accuracyChart.index(max_value)
 
     print("Best model = %d" % max_index)
     plt.plot(accuracyChart)
+    plt.plot(MLChart)
+    plt.plot(IoUChart)
     plt.show()
 
     timePrint(start)

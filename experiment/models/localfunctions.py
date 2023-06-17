@@ -89,6 +89,26 @@ g_class2color = {'total':	                [255,239,213],    #papayawhip	#FFEFD5	
                  'interior':	            [255,255,0]}      #yellow1	#FFFF00	RGB(255,255,0) interior
 g_label2color = {g_classes.index(cls): g_class2color[cls] for cls in g_classes}
 
+g_colorNames     = {'total':	                'papayawhip',         #papayawhip	#FFEFD5	RGB(255,239,213)
+                 'wall':	                'eggshell',           #eggshell	#FCE6C9	RGB(252,230,201) wall
+                 'window':	              'cornflowerblue',     #cornflowerblue	#6495ED	RGB(100,149,237) window
+                 'door':                  'cadmiumorange',      #cadmiumorange	#FF6103	RGB(255,97,3) door
+                 'molding':               'blueviolet',         #blueviolet	#8A2BE2	RGB(138,43,226) molding
+                 'other':	                'dimgray',            #dimgray	#696969	RGB(105,105,105) other
+                 'terrain':               'mint',               #mint	#BDFCC9	RGB(189,252,201) terrain
+                 'column':                'red1',               #red1	#FF0000	RGB(255,0,0) column
+                 'arch':                  'cobalt',             #cobalt	#3D59AB	RGB(61,89,171) arch
+                 'balcony':               'teal',               #teal	#008080	RGB(0,128,128) balcony
+                 'deco':                  'cyan2',              #cyan2	#00EEEE	RGB(0,238,238) deco
+                 'drainpipe':             'orange1',            #orange1	#FFA500	RGB(255,165,0) drainpipe
+                 'stairs':                'rosybrown',          #rosybrown	#BC8F8F	RGB(188,143,143) stairs
+                 'ground surface':        'lawngreen',          #lawngreen	#7CFC00	RGB(124,252,0) ground surface
+                 'roof':	                'firebrick4',         #firebrick4	#8B1A1A	RGB(139,26,26) roof
+                 'blinds':	              'lawngreen',          #lawngreen	#548B54	RGB(84,139,84) blinds
+                 'outer ceiling surface':	'darkgoldenrod',      #darkgoldenrod	#B8860B	RGB(184,134,11) outer ceiling surface
+                 'interior':	            'yellow1'}            #yellow1	#FFFF00	RGB(255,255,0) interior
+
+
 
 def timePrint(start):
     currTime = time.time()
@@ -159,6 +179,8 @@ def modelTraining(start_epoch, endepoch, alearning_rate, alr_decay, astep_size, 
     MOMENTUM_DECCAY = 0.5
     MOMENTUM_DECCAY_STEP = astep_size
     accuracyChart = []
+    MLChart = []
+    IoUChart = []
 
     global_epoch = 0
     best_iou = 0
@@ -291,8 +313,6 @@ def modelTraining(start_epoch, endepoch, alearning_rate, alr_decay, astep_size, 
             log_string('Eval mean loss: %f' % (loss_sum / num_batches))
             log_string('Eval accuracy: %f' % (total_correct / float(total_seen)))
 
-            tmpVal = (total_correct / float(total_seen))
-            accuracyChart.append(tmpVal)
 
             if mIoU >= best_iou:
                 best_iou = mIoU
@@ -308,9 +328,17 @@ def modelTraining(start_epoch, endepoch, alearning_rate, alr_decay, astep_size, 
                 torch.save(state, savepath)
                 log_string('Saving model....')
             log_string('Best mIoU: %f' % best_iou)
+            
+            tmpAcc = (total_correct / float(total_seen))
+            tmpML = (loss_sum / num_batches)
+            
+            accuracyChart.append(tmpAcc)
+            MLChart.append(tmpML)
+            IoUChart.append(best_iou)
+            
         global_epoch += 1
 
-    return accuracyChart
+    return accuracyChart, MLChart, IoUChart
 
 
 
@@ -411,10 +439,6 @@ def modelTesting(dataset, NUM_CLASSES, NUM_POINT, BATCH_SIZE, args, timezone,
                 for i in range(whole_scene_label.shape[0]):
                     color = g_label2color[pred_label[i]]
                     color_gt = g_label2color[whole_scene_label[i]]
-                    print("Pred part: %d" %pred_label[i])
-                    print(type(color))
-                    print("Color = ")
-                    print(color)
                     fout.write('v %f %f %f %d %d %d\n' % 
                               (whole_scene_data[i, 0], whole_scene_data[i, 1], whole_scene_data[i, 2], 
                                color[0], color[1],color[2]))
