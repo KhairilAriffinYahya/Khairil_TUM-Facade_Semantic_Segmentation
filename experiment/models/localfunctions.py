@@ -333,7 +333,7 @@ def modelTraining(start_epoch, endepoch, alearning_rate, alr_decay, astep_size, 
             tmpML = (loss_sum / num_batches)
             
             accuracyChart.append(tmpAcc)
-            MLChart.append(tmpML)
+            MLChart.append(float(tmpML))
             IoUChart.append(best_iou)
             
         global_epoch += 1
