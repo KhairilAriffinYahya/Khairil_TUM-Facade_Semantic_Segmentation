@@ -593,7 +593,6 @@ if __name__ == '__main__':
 
     print("Best model = %d" % max_index)
     plt.plot(accuracyChart)
-    plt.plot(MLChart)
     plt.plot(IoUChart)
     plt.show()
 
