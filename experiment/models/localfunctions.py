@@ -25,6 +25,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT_DIR = os.path.dirname(BASE_DIR)
 sys.path.append(BASE_DIR)
 
+
 #classes_8 = ["wall", "window", "door", "molding", "other", "terrain", "column", "arch"]
 '''              
                  #eggshell	#FCE6C9	RGB(252,230,201) wall
@@ -109,6 +110,7 @@ g_colorNames  = {'total':	                'papayawhip',         #papayawhip	#FFE
                  'interior':	            'yellow1'}            #yellow1	#FFFF00	RGB(255,255,0) interior
 
 
+tz = pytz.timezone('Asia/Singapore')
 
 def timePrint(start):
     currTime = time.time()
@@ -247,6 +249,7 @@ def modelTraining(start_epoch, endepoch, alearning_rate, alr_decay, astep_size, 
             torch.save(state, savepath)
             log_string('Saving model....')
 
+
         '''Evaluate on chopped scenes'''
         with torch.no_grad():
             num_batches = len(testDataLoader)
@@ -261,6 +264,7 @@ def modelTraining(start_epoch, endepoch, alearning_rate, alr_decay, astep_size, 
 
             log_string('---- EPOCH %03d EVALUATION ----' % (global_epoch + 1))
             for i, (points, target) in tqdm(enumerate(testDataLoader), total=len(testDataLoader), smoothing=0.9):
+                CurrentTime(tz)
                 points = points.data.numpy()
                 points = torch.Tensor(points)
                 # print("Batch shape:", points.shape)  # Debug
