@@ -591,10 +591,6 @@ if __name__ == '__main__':
     max_value = max(accuracyChart)
     max_index = accuracyChart.index(max_value)
 
-    print("Best model = %d" % max_index)
-    plt.plot(accuracyChart)
-    plt.plot(IoUChart)
-    plt.show()
 
     timePrint(start)
     CurrentTime(timezone)
