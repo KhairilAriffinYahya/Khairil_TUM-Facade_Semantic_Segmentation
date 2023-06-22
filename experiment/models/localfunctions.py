@@ -434,27 +434,45 @@ def modelTesting(dataset, NUM_CLASSES, NUM_POINT, BATCH_SIZE, args, timezone,
                 pl_save.write(str(int(i)) + '\n')
             pl_save.close()
 
+        
+
         if args.visual:
             if resultColor is True:
+                RGB_counter = {}
+                
                 for i in range(whole_scene_label.shape[0]):
                     color = g_label2color[pred_label[i]]
                     color_gt = g_label2color[whole_scene_label[i]]
+                    
+                    # Increment counter for the predicted label color
+                    if color in color_counter:
+                        RGB_counter[color] += 1
+                    else:
+                        RGB_counter[color] = 1
+                    
+                    
                     fout.write('v %f %f %f %d %d %d\n' % 
                               (whole_scene_data[i, 0], whole_scene_data[i, 1], whole_scene_data[i, 2], 
                                color[0], color[1],color[2]))
                     fout_gt.write('v %f %f %f %d %d %d\n' % 
                               (whole_scene_data[i, 0], whole_scene_data[i, 1], whole_scene_data[i, 2], 
                                color_gt[0],color_gt[1], color_gt[2]))
+                
+                # Print the color counter
+                print("Color Counter:")
+                for color, count in RGB_counter.items():
+                    print("Color:", color, "Count:", count)
+
+                
+                
+                
             else:
                 for i in range(whole_scene_label.shape[0]):
                     fout.write('v %f %f %f\n' % (
                         whole_scene_data[i, 0], whole_scene_data[i, 1], whole_scene_data[i, 2]))
                     fout_gt.write('v %f %f %f\n' % (
                         whole_scene_data[i, 0], whole_scene_data[i, 1], whole_scene_data[i, 2]))
-
-        if args.visual:
-            fout.close()
-            fout_gt.close()
+          
 
 
     IoU = np.array(total_correct_class) / (np.array(total_iou_deno_class, dtype=np.float64) + 1e-6)
