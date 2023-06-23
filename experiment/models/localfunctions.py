@@ -263,8 +263,8 @@ def modelTraining(start_epoch, endepoch, alearning_rate, alr_decay, astep_size, 
             classifier = classifier.eval()
 
             log_string('---- EPOCH %03d EVALUATION ----' % (global_epoch + 1))
+            CurrentTime(tz)
             for i, (points, target) in tqdm(enumerate(testDataLoader), total=len(testDataLoader), smoothing=0.9):
-                CurrentTime(tz)
                 points = points.data.numpy()
                 points = torch.Tensor(points)
                 # print("Batch shape:", points.shape)  # Debug
