@@ -449,7 +449,7 @@ def modelTesting(dataset, NUM_CLASSES, NUM_POINT, BATCH_SIZE, args, timezone,
                     color_gt = g_label2color[whole_scene_label[i]]
                     
                     # Increment counter for the predicted label color
-                    if color in color_counter:
+                    if color in RGB_counter:
                         RGB_counter[color] += 1
                     else:
                         RGB_counter[color] = 1
