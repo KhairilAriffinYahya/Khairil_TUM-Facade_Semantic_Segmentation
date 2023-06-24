@@ -442,17 +442,12 @@ def modelTesting(dataset, NUM_CLASSES, NUM_POINT, BATCH_SIZE, args, timezone,
 
         if args.visual:
             if resultColor is True:
-                RGB_counter = {}
+
                 
                 for i in range(whole_scene_label.shape[0]):
                     color = g_label2color[pred_label[i]]
                     color_gt = g_label2color[whole_scene_label[i]]
-                    
-                    # Increment counter for the predicted label color
-                    if color in RGB_counter:
-                        RGB_counter[color] += 1
-                    else:
-                        RGB_counter[color] = 1
+
                     
                     
                     fout.write('v %f %f %f %d %d %d\n' % 
@@ -462,12 +457,7 @@ def modelTesting(dataset, NUM_CLASSES, NUM_POINT, BATCH_SIZE, args, timezone,
                               (whole_scene_data[i, 0], whole_scene_data[i, 1], whole_scene_data[i, 2], 
                                color_gt[0],color_gt[1], color_gt[2]))
                 
-                # Print the color counter
-                print("Color Counter:")
-                for color, count in RGB_counter.items():
-                    print("Color:", color, "Count:", count)
 
-                
                 
                 
             else:
