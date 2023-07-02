@@ -13,7 +13,7 @@ import open3d as o3d
 import h5py
 import matplotlib.pyplot as plt
 import time
-from models.localfunctions import timePrint, CurrentTime, modelTesting
+from localfunctions import timePrint, CurrentTime, modelTesting
 from pathlib import Path
 from tqdm import tqdm
 from geofunction import cal_geofeature

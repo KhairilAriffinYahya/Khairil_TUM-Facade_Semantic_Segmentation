@@ -18,7 +18,7 @@ import h5py
 import provider
 import open3d as o3d
 from tqdm import tqdm
-from models.localfunctions import timePrint, CurrentTime, inplace_relu, modelTraining
+from localfunctions import timePrint, CurrentTime, inplace_relu, modelTraining
 from collections import Counter
 from torch.utils.data import Dataset, DataLoader, random_split
 from geofunction import cal_geofeature
