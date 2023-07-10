@@ -1,3 +1,13 @@
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+Author: Khairil Ariffin Bin Yahya
+School: Technical University of Munich
+Course: Earth Space Orientated Science and Technology
+Date: 20.06.2023
+
+
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+
+
 import argparse
 import os
 import torch
@@ -28,22 +38,23 @@ from geofunction import cal_geofeature
 timezone = pytz.timezone('Asia/Singapore')
 print("Check current time")
 CurrentTime(timezone)
-saveTrain = "traindataset.pkl"
-saveEval = "evaldataset.pkl"
+saveTrain = "traindataset.pkl" # save file name for training
+saveEval = "evaldataset.pkl" # save file name for evaluation
 saveDir = "/content/Khairil_PN2_experiment/experiment/data/saved_data/"
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 train_ratio = 0.7
 dataColor = True #if data lack color set this to False
 
-
+# Original TUM-Facade Classes
 classes_18 = ["total", "wall", "window",  "door",  "balcony","molding", "deco", "column", "arch", "drainpipe", "stairs",
            "ground surface", "terrain",  "roof",  "blinds", "outer ceiling surface", "interior", "other"]
 NUM_CLASSES_18 = 18
 
+# TUM-Facade class handling
 # 0: wall, # 1: window, # 2: door, # 3: molding, # 4: other, # 5: terrain, # 6: column, # 7: arch
 classes_8 = ["wall", "window", "door", "molding", "other", "terrain", "column", "arch"]
 NUM_CLASSES_8 = 8
-
+new_class_mapping = {1: 0, 2: 1, 3: 2, 6: 3, 13: 4, 11: 5, 7: 6, 8: 7}
 
 # Adjust parameters here if there no changes to reduce line
 def parse_args():
@@ -77,9 +88,9 @@ def parse_args():
     return parser.parse_args()
 
 
-''''''
+''''''''''''''''''''''''''''''''''''''''''''''''
 
-class TrainCustomDataset(Dataset):
+class TrainCustomDataset(Dataset): # Dataset class to extract point cloud model and prepare for PointNet/PointNet++
     def __init__(self, las_file_list=None, feature_list=[], num_classes=8, num_point=4096, block_size=1.0,
                  sample_rate=1.0, transform=None, indices=None, class8 = True):
         super().__init__()
@@ -102,7 +113,7 @@ class TrainCustomDataset(Dataset):
             return
 
         adjustedclass = num_classes
-        range_class = num_classes + 1
+        range_class = num_classes + 1 #need to be set 1 array larger
 
         # Use glob to find all .las files in the data_root directory
         las_files = las_file_list
@@ -111,8 +122,7 @@ class TrainCustomDataset(Dataset):
         num_point_all = []
         labelweights = np.zeros(adjustedclass)
 
-        new_class_mapping = {1: 0, 2: 1, 3: 2, 6: 3, 13: 4, 11: 5, 7: 6, 8: 7}
-
+        # Point cloud model feature selection
         if dataColor is True:
             feature_list.append("red")
             feature_list.append("blue")
@@ -129,7 +139,7 @@ class TrainCustomDataset(Dataset):
             coords = np.vstack((las_data.x, las_data.y, las_data.z)).transpose()
             labels = np.array(las_data.classification, dtype=np.uint8)
 
-            # Find available properties
+            # Find available properties debug
             # available_properties = las_data.point_format.dimension_names
             # print("Available properties:")
             # for prop in available_properties:
@@ -276,8 +286,7 @@ class TrainCustomDataset(Dataset):
     def index_update(self, newIndices):  # adjust index
         self.room_idxs = newIndices
 
-    def copy(self, indices=None):
-        # COPY EVERYTHING EXCEPT FOR INDEX
+    def copy(self, indices=None): # COPY EVERYTHING EXCEPT FOR INDEX
         copied_dataset = TrainCustomDataset()
         copied_dataset.num_point = self.num_point
         copied_dataset.block_size = self.block_size
@@ -300,12 +309,12 @@ class TrainCustomDataset(Dataset):
         print("Totally {} samples in dataset.".format(len(copied_dataset.room_idxs)))
         return copied_dataset
 
-    def save_data(self, file_path):
+    def save_data(self, file_path): # Save extracted dataset
         with open(file_path, 'wb') as f:
             pickle.dump(self, f)
 
     @staticmethod
-    def load_data(file_path):
+    def load_data(file_path): # Load extracted dataset
         with open(file_path, 'rb') as f:
             dataset = pickle.load(f)
 
@@ -353,7 +362,7 @@ def main(args):
     else:
         print("No extra features")
 
-    '''HYPER PARAMETER'''
+    # Hyper Parameter
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
 
     '''CREATE DIR'''
@@ -509,14 +518,14 @@ def main(args):
     evalDataLoader = DataLoader(EVAL_DATASET, batch_size=BATCH_SIZE, shuffle=False, num_workers=8,
                                 pin_memory=True, drop_last=True)
 
-    print("wall", "window", "door", "molding", "other", "terrain", "column", "arch")
-    train_labelweights = TRAIN_DATASET.calculate_labelweights()
-
     train_weights = torch.Tensor(train_labelweights).cuda()
     log_string("The number of training data is: %d" % len(TRAIN_DATASET))
+    print("wall", "window", "door", "molding", "other", "terrain", "column", "arch") # Adjust according to dataset
+    train_labelweights = TRAIN_DATASET.calculate_labelweights()
     log_string("The number of eval data is: %d" % len(EVAL_DATASET))
+    print("wall", "window", "door", "molding", "other", "terrain", "column", "arch") # Adjust according to dataset
+    eval_labelweights = EVAL_DATASET.calculate_labelweights()
 
-    print("Length of the dataset:", len(TRAIN_DATASET))
     print("Length of the trainDataLoader:", len(trainDataLoader))
 
     '''MODEL LOADING'''
@@ -542,6 +551,7 @@ def main(args):
 
     model_name = args.output_model
 
+    # Check if model used has been trained on similar dataset before, else start new
     try:
         checkpoint = torch.load(str(experiment_dir) + '/checkpoints' + model_name)
         start_epoch = checkpoint['epoch']
@@ -552,6 +562,7 @@ def main(args):
         start_epoch = 0
         classifier = classifier.apply(weights_init)
 
+    # Select optimizer
     if args.optimizer == 'Adam':
         optimizer = torch.optim.Adam(
             classifier.parameters(),
@@ -575,6 +586,7 @@ def main(args):
     timePrint(start)
     CurrentTime(timezone)
 
+    # Train model
     accuracyChart, MLChart, IoUChart =  modelTraining(start_epoch, args.epoch, args.learning_rate, args.lr_decay, args.step_size,
                                         BATCH_SIZE, NUM_POINT, NUM_CLASSES, trainDataLoader, evalDataLoader, classifier,
                                         optimizer, criterion, train_weights, checkpoints_dir, model_name, seg_label_to_cat,
@@ -590,6 +602,7 @@ if __name__ == '__main__':
 
     max_value = max(accuracyChart)
     max_index = accuracyChart.index(max_value)
+
 
     timePrint(start)
     CurrentTime(timezone)
