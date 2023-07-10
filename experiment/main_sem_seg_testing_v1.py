@@ -1,3 +1,12 @@
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+Author: Khairil Ariffin Bin Yahya
+School: Technical University of Munich
+Course: Earth Space Orientated Science and Technology
+Date: 20.06.2023
+
+
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+
 import argparse
 import os
 import torch
@@ -30,14 +39,16 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 train_ratio = 0.7
 dataColor = True #if data lack color set this to False
 
-
+# For TUM-Facade
 classes_18 = ["total", "wall", "window",  "door",  "balcony","molding", "deco", "column", "arch", "drainpipe", "stairs",
            "ground surface", "terrain",  "roof",  "blinds", "outer ceiling surface", "interior", "other"]
 NUM_CLASSES_18 = 18
 
+# TUM-Facade adjusted classes
 # 0: wall, # 1: window, # 2: door, # 3: molding, # 4: other, # 5: terrain, # 6: column, # 7: arch
 classes_8 = ["wall", "window", "door", "molding", "other", "terrain", "column", "arch"]
 NUM_CLASSES_8 = 8
+new_class_mapping = {1: 0, 2: 1, 3: 2, 6: 3, 13: 4, 11: 5, 7: 6, 8: 7}
 
 # Adjust parameters here if there no changes to reduce line
 
@@ -70,8 +81,9 @@ def parse_args():
 
     return parser.parse_args()
 
-''''''
+''''''''''''''''''''''''''''''''''''''''''''''''''''''
 
+# Extract and create dataset to be used in testing of PointNet/PointNet++ model
 class TestCustomDataset():
     # prepare to give prediction on each points
     def __init__(self, root, las_file_list='trainval_fullarea', feature_list=[], num_classes=8, block_points=4096, stride=0.5,
@@ -102,8 +114,8 @@ class TestCustomDataset():
         adjustedclass = num_classes
         range_class = adjustedclass + 1
 
-        new_class_mapping = {1: 0, 2: 1, 3: 2, 6: 3, 13: 4, 11: 5, 7: 6, 8: 7}
-
+        
+        # Feature selection
         if dataColor is True:        
             feature_list.append("red")
             feature_list.append("blue")
@@ -113,7 +125,7 @@ class TestCustomDataset():
             self.num_extra_features += 1
             self.feature_name.append(feature)
 
-
+        # read files
         for files in self.file_list:
             file_path = os.path.join(root, files)
             # Read LAS file
@@ -153,8 +165,10 @@ class TestCustomDataset():
             coord_min, coord_max = np.amin(points, axis=0)[:3], np.amax(points, axis=0)[:3]
             self.room_coord_min.append(coord_min), self.room_coord_max.append(coord_max)
             
+        # Debugger
         assert len(self.scene_points_list) == len(self.semantic_labels_list)
         
+        # Prepare labels
         labelweights = np.zeros(num_classes)
         for seg in self.semantic_labels_list:
             tmp, _ = np.histogram(seg, range(range_class))
@@ -238,13 +252,13 @@ class TestCustomDataset():
     def __len__(self):
         return len(self.scene_points_list)
 
-    def filtered_indices(self):
+    def filtered_indices(self): # Remove unwanted points
         total_indices = set(range(len(self.scene_points_list)))
         non_index_set = set(self.non_index)
         filtered_indices = list(total_indices - non_index_set)
         return filtered_indices
 
-    def index_update(self, new_indices):
+    def index_update(self, new_indices): # Adjust index
         tmp_scene_points_num = []
         tmp_scene_points_list = [self.scene_points_list[i] for i in new_indices]
         tmp_semantic_labels_list = [self.semantic_labels_list[i] for i in new_indices]
@@ -291,6 +305,7 @@ class TestCustomDataset():
 
         return new_dataset
 
+    # Get weight of dataset
     def calculate_labelweights(self):
         print("Calculate Weights")
         num_classes = self.num_classes
@@ -311,12 +326,12 @@ class TestCustomDataset():
 
         return labelweights, tmp_scene_points_num
 
-    def save_data(self, file_path):
+    def save_data(self, file_path): # Save extracted dataset
         with open(file_path, 'wb') as f:
             pickle.dump(self, f)
 
     @staticmethod
-    def load_data(file_path):
+    def load_data(file_path): # Load extracted dataset
         with open(file_path, 'rb') as f:
             dataset = pickle.load(f)
 
@@ -366,7 +381,7 @@ def main(args):
     else:
         print("No extra features")
 
-    '''HYPER PARAMETER'''
+    # Hyper parameter
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
     if args.exp_dir is None:
         tmp_dir = 'log/sem_seg/'
@@ -392,7 +407,7 @@ def main(args):
     log_string('PARAMETER ...')
     log_string(args)
 
-    '''Dataset'''
+    '''Prepare Dataset'''
     testdatatime = time.time()
 
     print("start loading test data ...")
@@ -437,9 +452,12 @@ def main(args):
         TEST_DATASET_WHOLE_SCENE = TestCustomDataset.load_data(saveDir + saveTest)
 
     log_string("The number of test data is: %d" % len(TEST_DATASET_WHOLE_SCENE))
+    print("wall", "window", "door", "molding", "other", "terrain", "column", "arch") # Adjust according to dataset
+    test_labelweights = TEST_DATASET_WHOLE_SCENE.calculate_labelweights()
     timePrint(testdatatime)
     CurrentTime(timezone)
 
+    
     if args.save is True:
         print("Save Test dataset")
         savetesttime = time.time()

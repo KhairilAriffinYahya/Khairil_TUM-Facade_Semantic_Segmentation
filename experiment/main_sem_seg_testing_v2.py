@@ -1,3 +1,12 @@
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+Author: Khairil Ariffin Bin Yahya
+School: Technical University of Munich
+Course: Earth Space Orientated Science and Technology
+Date: 20.06.2023
+
+
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+
 import argparse
 import os
 import torch
@@ -437,6 +446,8 @@ def main(args):
         TEST_DATASET_WHOLE_SCENE = TestCustomDataset.load_data(saveDir + saveTest)
 
     log_string("The number of test data is: %d" % len(TEST_DATASET_WHOLE_SCENE))
+    print("wall", "window", "door", "molding", "other", "terrain", "column", "arch") # Adjust according to dataset
+    test_labelweights = TEST_DATASET_WHOLE_SCENE.calculate_labelweights()
     timePrint(testdatatime)
     CurrentTime(timezone)
 
