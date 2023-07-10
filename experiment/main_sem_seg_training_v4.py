@@ -407,7 +407,7 @@ def main(args):
         for dimension in in_file.point_format:
             print(dimension.name)
 
-    '''Load Dataset'''
+    '''Prepare Dataset'''
     loadtime = time.time()
 
     if args.load is False:
