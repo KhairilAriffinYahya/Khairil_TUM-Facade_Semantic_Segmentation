@@ -518,13 +518,13 @@ def main(args):
     evalDataLoader = DataLoader(EVAL_DATASET, batch_size=BATCH_SIZE, shuffle=False, num_workers=8,
                                 pin_memory=True, drop_last=True)
 
-    train_weights = torch.Tensor(train_labelweights).cuda()
     log_string("The number of training data is: %d" % len(TRAIN_DATASET))
     print("wall", "window", "door", "molding", "other", "terrain", "column", "arch") # Adjust according to dataset
     train_labelweights = TRAIN_DATASET.calculate_labelweights()
     log_string("The number of eval data is: %d" % len(EVAL_DATASET))
     print("wall", "window", "door", "molding", "other", "terrain", "column", "arch") # Adjust according to dataset
     eval_labelweights = EVAL_DATASET.calculate_labelweights()
+    train_weights = torch.Tensor(train_labelweights).cuda()
 
     print("Length of the trainDataLoader:", len(trainDataLoader))
 
