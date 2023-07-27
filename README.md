@@ -1,6 +1,6 @@
 # PointNet and PointNet++ for TUM-Facade
 
-This repo is PointNet++ and PointNet implementation for TUM-Facade. It is based off the repo by Xu Yan PointNet++ pytorch https://github.com/yanx27/Pointnet_Pointnet2_pytorch. It is usable in Google Colab 2023.
+This repo is PointNet++ and PointNet semantic segmentation implementation for TUM-Facade. It is based off the repo by Xu Yan PointNet++ pytorch https://github.com/yanx27/Pointnet_Pointnet2_pytorch. It is usable in Google Colab 2023.
 
 
 ## Install following modules and packages
