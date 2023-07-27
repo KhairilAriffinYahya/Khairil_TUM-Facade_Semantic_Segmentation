@@ -1,3 +1,13 @@
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+Author: Khairil Ariffin Bin Yahya
+School: Technical University of Munich
+Course: Earth Space Orientated Science and Technology
+Date: 20.06.2023
+
+*The function here were unused, geometric features were added in through CloudCompare
+
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+
 import argparse
 import os
 import torch
@@ -20,6 +30,7 @@ import time
 import open3d as o3d
 import pickle
 
+# PCA function
 def PCA(data, correlation=False, sort=True):
     average_data = np.mean(data, axis=0)  # 求 NX3 向量的均值
     decentration_matrix = data - average_data  # 去中心化
@@ -34,7 +45,7 @@ def PCA(data, correlation=False, sort=True):
 
     return eigenvalues, eigenvectors
 
-
+#  Main calculate the feature Omnivariance, Planarity, Surface Curvature
 def collFeatures(pcd, length, size=0.8, num_of_files=1):
     pcd_tree = o3d.geometry.KDTreeFlann(pcd)  # set a kd tree for tha point cloud, make searching faster
     normals = []

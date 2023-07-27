@@ -1,3 +1,11 @@
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+Author: Khairil Ariffin Bin Yahya
+School: Technical University of Munich
+Course: Earth Space Orientated Science and Technology
+Date: 20.06.2023
+
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+
 import os
 import torch
 import datetime
@@ -24,47 +32,6 @@ from pathlib import Path
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT_DIR = os.path.dirname(BASE_DIR)
 sys.path.append(BASE_DIR)
-
-
-#classes_8 = ["wall", "window", "door", "molding", "other", "terrain", "column", "arch"]
-'''              
-                 #eggshell	#FCE6C9	RGB(252,230,201) wall
-                 #cornflowerblue	#6495ED	RGB(100,149,237) window
-                 #cadmiumorange	#FF6103	RGB(255,97,3) door
-                 #teal	#008080	RGB(0,128,128) balcony
-                 #blueviolet	#8A2BE2	RGB(138,43,226) molding
-                 #cyan2	#00EEEE	RGB(0,238,238) deco
-                 #red1	#FF0000	RGB(255,0,0) column
-                 #cobalt	#3D59AB	RGB(61,89,171) arch
-                 #orange1	#FFA500	RGB(255,165,0) drainpipe
-                 #rosybrown	#BC8F8F	RGB(188,143,143) stairs
-                 #lawngreen	#7CFC00	RGB(124,252,0) ground surface
-                 #mint	#BDFCC9	RGB(189,252,201) terrain
-                 #firebrick4	#8B1A1A	RGB(139,26,26) roof
-                 #alegreen4	#548B54	RGB(84,139,84) blinds
-                 #darkgoldenrod	#B8860B	RGB(184,134,11) outer ceiling surface
-                 #yellow1	#FFFF00	RGB(255,255,0) interior
-                 #dimgray	#696969	RGB(105,105,105) other
-                 
-g_class2color = {'total':	                [0,0,0],
-                 'wall':	                [0,255,0],
-                 'window':	              [0,0,255],
-                 'door':                  [0,255,255],
-                 'molding':               [255,255,0],
-                 'other':	                [255,0,255],
-                 'terrain':               [100,100,255], 
-                 'column':                [200,200,100],
-                 'arch':                  [170,120,200],
-                 'balcony':               [255,0,0],
-                 'deco':                  [0,0,150],
-                 'drainpipe':             [20,70,0],
-                 'stairs':                [0,50,70],
-                 'ground surface':        [50,50,50],
-                 'roof':	                [10,20,10],
-                 'blinds':	              [100,255,100],
-                 'outer ceiling surface':	[200,100,100],
-                 'interior':	            [50,50,50]}       
-'''
 
 
 g_classes = ["total", "wall", "window",  "door",  "balcony","molding", "deco", "column", "arch", "drainpipe", "stairs",
@@ -346,7 +313,7 @@ def modelTraining(start_epoch, endepoch, alearning_rate, alr_decay, astep_size, 
 
 
 
-'''Testing'''
+'''Testing Phase'''
 def add_vote(vote_label_pool, point_idx, pred_label, weight):
     B = pred_label.shape[0]
     N = pred_label.shape[1]
@@ -356,7 +323,7 @@ def add_vote(vote_label_pool, point_idx, pred_label, weight):
                 vote_label_pool[int(point_idx[b, n]), int(pred_label[b, n])] += 1
     return vote_label_pool
 
-
+# Testing of PN
 def modelTesting(dataset, NUM_CLASSES, NUM_POINT, BATCH_SIZE, args, timezone,
                  num_of_features, log_string, visual_dir, classifier, seg_label_to_cat, resultColor):
     scene_id = dataset.file_list
