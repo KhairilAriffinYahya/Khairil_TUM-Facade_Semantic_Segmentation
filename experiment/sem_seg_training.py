@@ -42,7 +42,6 @@ saveEval = "evaldataset.pkl" # save file name for evaluation
 saveDir = "/content/Khairil_PN2_experiment/experiment/data/saved_data/"
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 train_ratio = 0.7
-dataColor = True #if data lack color set this to False
 
 # Original TUM-Facade Classes
 classes_18 = ["total", "wall", "window",  "door",  "balcony","molding", "deco", "column", "arch", "drainpipe", "stairs",
@@ -84,6 +83,7 @@ def parse_args():
     parser.add_argument('--downsample', type=bool, default=False, help='downsample data')
     parser.add_argument('--calculate_geometry', type=bool, default=False, help='decide where to calculate geometry')
     parser.add_argument('--class8',  default=False, action="store_true", help='Select 17 classes or 8 classes data')
+    parser.add_argument('--RGB_OFF',  default=True, action="store_false", help='Select to use RGB or not')
     return parser.parse_args()
 
 
@@ -346,6 +346,13 @@ def main(args):
     for i, cat in enumerate(seg_classes.keys()):
         seg_label_to_cat[i] = cat
     print(seg_label_to_cat)
+
+    # Select if color to be used
+    if args.RGB_OFF is False:
+        dataColor = True 
+    else:
+        dataColor = False #if data lack color set this to False
+
 
 
     root = args.rootdir
