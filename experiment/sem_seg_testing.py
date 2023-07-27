@@ -87,7 +87,7 @@ def parse_args():
 class TestCustomDataset():
     # prepare to give prediction on each points
     def __init__(self, root, las_file_list='trainval_fullarea', feature_list=[], num_classes=8, block_points=4096, stride=0.5,
-                 block_size=1.0, padding=0.001, class8 = True):
+                 block_size=1.0, padding=0.001, Color = True, class8 = True):
         self.block_points = block_points
         self.block_size = block_size
         self.padding = padding
@@ -116,7 +116,7 @@ class TestCustomDataset():
 
         
         # Feature selection
-        if dataColor is True:        
+        if Color is True:        
             feature_list.append("red")
             feature_list.append("blue")
             feature_list.append("green")
@@ -364,9 +364,10 @@ def main(args):
 
     # Select if color to be used
     if args.RGB_OFF is False:
-        dataColor = True 
-    else:
         dataColor = False #if data lack color set this to False
+    else:
+        dataColor = True 
+
         
     sys.path.append(os.path.join(BASE_DIR, 'models'))
     class2label = {cls: i for i, cls in enumerate(classes)}
@@ -434,7 +435,7 @@ def main(args):
             if 'Surface variation' in feature_list:
                 tmp_feature_list.remove('Surface variation')
                 
-        TEST_DATASET_WHOLE_SCENE = TestCustomDataset(root, test_file, tmp_feature_list, num_classes=NUM_CLASSES, block_points=NUM_POINT, class8=args.class8)
+        TEST_DATASET_WHOLE_SCENE = TestCustomDataset(root, test_file, tmp_feature_list, num_classes=NUM_CLASSES, block_points=NUM_POINT, Color = dataColor, class8=args.class8)
 
         if args.calculate_geometry is True:
             print("room_idx test")

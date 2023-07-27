@@ -91,7 +91,7 @@ def parse_args():
 
 class TrainCustomDataset(Dataset): # Dataset class to extract point cloud model and prepare for PointNet/PointNet++
     def __init__(self, las_file_list=None, feature_list=[], num_classes=8, num_point=4096, block_size=1.0,
-                 sample_rate=1.0, transform=None, indices=None, class8 = True):
+                 sample_rate=1.0, transform=None, indices=None, Color = True, class8 = True):
         super().__init__()
         self.num_point = num_point
         self.block_size = block_size
@@ -122,7 +122,7 @@ class TrainCustomDataset(Dataset): # Dataset class to extract point cloud model 
         labelweights = np.zeros(adjustedclass)
 
         # Point cloud model feature selection
-        if dataColor is True:
+        if Color is True:
             feature_list.append("red")
             feature_list.append("blue")
             feature_list.append("green")
@@ -349,9 +349,9 @@ def main(args):
 
     # Select if color to be used
     if args.RGB_OFF is False:
-        dataColor = True 
-    else:
         dataColor = False #if data lack color set this to False
+    else:
+        dataColor = True 
 
 
 
@@ -432,7 +432,7 @@ def main(args):
                 tmp_feature_list.remove('Surface variation')
 
         lidar_dataset = TrainCustomDataset(las_file_list, tmp_feature_list, num_classes=NUM_CLASSES, num_point=NUM_POINT,
-                                           transform=None, class8=args.class8)
+                                           transform=None, Color = dataColor, class8=args.class8)
         print("Dataset taken")
 
         # Split the dataset into training and evaluation sets
