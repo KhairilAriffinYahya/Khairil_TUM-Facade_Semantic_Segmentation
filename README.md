@@ -5,10 +5,15 @@ This repo is PointNet++ and PointNet semantic segmentation implementation for TU
 
 ## Install following modules and packages
 pip install laspy
+
 pip install scikit-learn
+
 pip install matplotlib
+
 pip install pytz
+
 pip install torchviz
+
 pip install open3d
 
 
