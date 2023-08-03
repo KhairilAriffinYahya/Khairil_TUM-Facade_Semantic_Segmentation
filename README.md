@@ -19,10 +19,12 @@ Download from https://github.com/OloOcki/tum-facade.
 
 Example 1:
 %run sem_seg_training.py  --save True --epoch 25 --rootdir 'YOUR FILE DIRECTORY' --test_area 'DEBY_LOD2_4959323.las'
+
 !python sem_seg_testing.py  --save True ---rootdir 'YOUR FILE DIRECTORY' --visual --num_votes 1 --test_area 'DEBY_LOD2_4959323.las'
 
 Example 2:
 %run sem_seg_training.py  --save True --epoch 25 --RGB_OFF --rootdir 'YOUR FILE DIRECTORY' --test_area 'DEBY_LOD2_4959323.las'
+
 !python sem_seg_testing.py  --save True --RGB_OFF --rootdir 'YOUR FILE DIRECTORY' --visual --num_votes 1 --test_area 'DEBY_LOD2_4959323.las'
 
 
