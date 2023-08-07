@@ -33,7 +33,7 @@ timezone = pytz.timezone('Asia/Singapore')
 print("Check current time")
 CurrentTime(timezone)
 saveTest = "testdataset.pkl"
-saveDir = "/content/Khairil_PN2_experiment/experiment/data/saved_data/"
+saveDir = "/content/Khairil_PN2_experiment/data/saved_data/"
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 train_ratio = 0.7

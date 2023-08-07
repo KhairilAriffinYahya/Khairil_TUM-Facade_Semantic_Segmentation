@@ -39,7 +39,7 @@ print("Check current time")
 CurrentTime(timezone)
 saveTrain = "traindataset.pkl" # save file name for training
 saveEval = "evaldataset.pkl" # save file name for evaluation
-saveDir = "/content/Khairil_PN2_experiment/experiment/data/saved_data/"
+saveDir = "/content/Khairil_PN2_experiment/data/saved_data/"
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 train_ratio = 0.7
 
