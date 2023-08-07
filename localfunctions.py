@@ -343,8 +343,8 @@ def modelTesting(dataset, NUM_CLASSES, NUM_POINT, BATCH_SIZE, args, timezone,
         total_iou_deno_class_tmp = [0 for _ in range(NUM_CLASSES)]
 
         if args.visual:
-            fout = open(os.path.join(visual_dir, scene_id[batch_idx] + '_pred.obj'), 'w')
-            fout_gt = open(os.path.join(visual_dir, scene_id[batch_idx] + '_gt.obj'), 'w')
+            fout = open(os.path.join(visual_dir, scene_id[batch_idx] + '_pred.las'), 'w')
+            fout_gt = open(os.path.join(visual_dir, scene_id[batch_idx] + '_gt.las'), 'w')
 
         whole_scene_data = dataset.scene_points_list[batch_idx]
         whole_scene_label = dataset.semantic_labels_list[batch_idx]
