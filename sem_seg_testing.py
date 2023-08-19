@@ -358,9 +358,11 @@ def main(args):
     if args.class8 is False:
         classes = classes_18
         NUM_CLASSES = NUM_CLASSES_18
+        class8label = False
     else:
         classes = classes_8
         NUM_CLASSES = NUM_CLASSES_8
+        class8label = True
 
     # Select if color to be used
     if args.RGB_OFF is False:
@@ -502,7 +504,7 @@ def main(args):
     with torch.no_grad():
         print("Begin testing")
         modelTesting(TEST_DATASET_WHOLE_SCENE, NUM_CLASSES, NUM_POINT, BATCH_SIZE, args, timezone,
-                     num_of_features, log_string, visual_dir, classifier, seg_label_to_cat, True)
+                     num_of_features, log_string, visual_dir, classifier, seg_label_to_cat, True, class8label)
         print("Done!")
 
 if __name__ == '__main__':

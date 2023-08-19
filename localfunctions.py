@@ -76,6 +76,28 @@ g_colorNames  = {'total':	                'papayawhip',         #papayawhip	#FFE
                  'outer ceiling surface':	'darkgoldenrod',      #darkgoldenrod	#B8860B	RGB(184,134,11) outer ceiling surface
                  'interior':	            'yellow1'}            #yellow1	#FFFF00	RGB(255,255,0) interior
 
+g_8classes = ["wall", "window",  "door", "molding", "other", "terrain","column", "arch"]
+g_8class2label = {cls: i for i,cls in enumerate(g_8classes)}
+g_8class2color = {
+                 'wall':	                [255,240,180],    #eggshell	        #FCE6C9	RGB(252,230,201) wall
+                 'window':	                [100,149,237],    #cornflowerblue	#6495ED	RGB(100,149,237) window
+                 'door':                    [255,97,3],       #cadmiumorange	#FF6103	RGB(255,97,3) door
+                 'molding':                 [138,43,226],     #blueviolet	    #8A2BE2	RGB(138,43,226) molding
+                 'other':	                [105,105,105],    #dimgray	        #696969	RGB(105,105,105) other
+                 'terrain':                 [189,252,201],    #mint	            #BDFCC9	RGB(189,252,201) terrain
+                 'column':                  [255,0,0],        #red1	            #FF0000	RGB(255,0,0) column
+                 'arch':                    [61,89,171]}      #cobalt	        #3D59AB	RGB(61,89,171) arch
+g_8label2color = {g_8classes.index(cls): g_8class2color[cls] for cls in g_8classes}
+
+g_8colorNames  = {
+                 'wall':	                'eggshell',           #eggshell	#FCE6C9	RGB(252,230,201) wall
+                 'window':	              'cornflowerblue',     #cornflowerblue	#6495ED	RGB(100,149,237) window
+                 'door':                  'cadmiumorange',      #cadmiumorange	#FF6103	RGB(255,97,3) door
+                 'molding':               'blueviolet',         #blueviolet	#8A2BE2	RGB(138,43,226) molding
+                 'other':	                'dimgray',            #dimgray	#696969	RGB(105,105,105) other
+                 'terrain':               'mint',               #mint	#BDFCC9	RGB(189,252,201) terrain
+                 'column':                'red1',               #red1	#FF0000	RGB(255,0,0) column
+                 'arch':                  'cobalt'}             #cobalt	#3D59AB	RGB(61,89,171) arch
 
 tz = pytz.timezone('Asia/Singapore')
 
@@ -325,7 +347,7 @@ def add_vote(vote_label_pool, point_idx, pred_label, weight):
 
 # Testing of PN
 def modelTesting(dataset, NUM_CLASSES, NUM_POINT, BATCH_SIZE, args, timezone,
-                 num_of_features, log_string, visual_dir, classifier, seg_label_to_cat, resultColor):
+                 num_of_features, log_string, visual_dir, classifier, seg_label_to_cat, resultColor, class8label):
     scene_id = dataset.file_list
     scene_id = [x[:-4] for x in scene_id]
     num_batches = len(dataset)
@@ -409,24 +431,26 @@ def modelTesting(dataset, NUM_CLASSES, NUM_POINT, BATCH_SIZE, args, timezone,
 
         if args.visual:
             if resultColor is True:
-
-                
-                for i in range(whole_scene_label.shape[0]):
-                    color = g_label2color[pred_label[i]]
-                    color_gt = g_label2color[whole_scene_label[i]]
-
-                    
-                    
-                    fout.write('v %f %f %f %d %d %d\n' % 
-                              (whole_scene_data[i, 0], whole_scene_data[i, 1], whole_scene_data[i, 2], 
-                               color[0], color[1],color[2]))
-                    fout_gt.write('v %f %f %f %d %d %d\n' % 
-                              (whole_scene_data[i, 0], whole_scene_data[i, 1], whole_scene_data[i, 2], 
-                               color_gt[0],color_gt[1], color_gt[2]))
-                
-
-                
-                
+                if class8label is True:
+                    for i in range(whole_scene_label.shape[0]):
+                        color = g_8class2colorlabel2color[pred_label[i]]
+                        color_gt = g_8label2color[whole_scene_label[i]]
+                        fout.write('v %f %f %f %d %d %d\n' % 
+                                  (whole_scene_data[i, 0], whole_scene_data[i, 1], whole_scene_data[i, 2], 
+                                   color[0], color[1],color[2]))
+                        fout_gt.write('v %f %f %f %d %d %d\n' % 
+                                  (whole_scene_data[i, 0], whole_scene_data[i, 1], whole_scene_data[i, 2], 
+                                   color_gt[0],color_gt[1], color_gt[2]))
+                else:
+                    for i in range(whole_scene_label.shape[0]):
+                        color = g_label2color[pred_label[i]]
+                        color_gt = g_label2color[whole_scene_label[i]]
+                        fout.write('v %f %f %f %d %d %d\n' % 
+                                  (whole_scene_data[i, 0], whole_scene_data[i, 1], whole_scene_data[i, 2], 
+                                   color[0], color[1],color[2]))
+                        fout_gt.write('v %f %f %f %d %d %d\n' % 
+                                  (whole_scene_data[i, 0], whole_scene_data[i, 1], whole_scene_data[i, 2], 
+                                   color_gt[0],color_gt[1], color_gt[2]))
             else:
                 for i in range(whole_scene_label.shape[0]):
                     fout.write('v %f %f %f\n' % (
