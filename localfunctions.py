@@ -433,7 +433,7 @@ def modelTesting(dataset, NUM_CLASSES, NUM_POINT, BATCH_SIZE, args, timezone,
             if resultColor is True:
                 if class8label is True:
                     for i in range(whole_scene_label.shape[0]):
-                        color = g_8class2colorlabel2color[pred_label[i]]
+                        color = g_8label2color[pred_label[i]]
                         color_gt = g_8label2color[whole_scene_label[i]]
                         fout.write('v %f %f %f %d %d %d\n' % 
                                   (whole_scene_data[i, 0], whole_scene_data[i, 1], whole_scene_data[i, 2], 
