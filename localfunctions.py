@@ -37,42 +37,42 @@ sys.path.append(BASE_DIR)
 g_classes = ["total", "wall", "window",  "door",  "balcony","molding", "deco", "column", "arch", "drainpipe", "stairs",
            "ground surface", "terrain",  "roof",  "blinds", "outer ceiling surface", "interior", "other"]
 g_class2label = {cls: i for i,cls in enumerate(g_classes)}
-g_class2color = {'total':	                [255,255,255],    #papayawhip	#FFEFD5	RGB(255,239,213)
+g_class2color = {'total':	                [255,255,255],    #white
                  'wall':	                [255,240,180],    #eggshell	#FCE6C9	RGB(252,230,201) wall
-                 'window':	              [100,149,237],    #cornflowerblue	#6495ED	RGB(100,149,237) window
-                 'door':                  [255,97,3],       #cadmiumorange	#FF6103	RGB(255,97,3) door
-                 'molding':               [138,43,226],     #blueviolet	#8A2BE2	RGB(138,43,226) molding
-                 'other':	                [105,105,105],    #dimgray	#696969	RGB(105,105,105) other
-                 'terrain':               [189,252,201],    #mint	#BDFCC9	RGB(189,252,201) terrain
-                 'column':                [255,0,0],        #red1	#FF0000	RGB(255,0,0) column
-                 'arch':                  [61,89,171],      #cobalt	#3D59AB	RGB(61,89,171) arch
-                 'balcony':               [0,128,128],      #teal	#008080	RGB(0,128,128) balcony
-                 'deco':                  [0,238,238],      #cyan2	#00EEEE	RGB(0,238,238) deco
-                 'drainpipe':             [255,165,0],      #orange1	#FFA500	RGB(255,165,0) drainpipe
-                 'stairs':                [188,143,143],    #rosybrown	#BC8F8F	RGB(188,143,143) stairs
-                 'ground surface':        [124,252,0],      #lawngreen	#7CFC00	RGB(124,252,0) ground surface
+                 'window':	                [100,149,237],    #cornflowerblue	#6495ED	RGB(100,149,237) window
+                 'door':                    [255,97,3],       #cadmiumorange	#FF6103	RGB(255,97,3) door
+                 'balcony':                 [0,128,128],      #teal	#008080	RGB(0,128,128) balcony
+                 'molding':                 [138,43,226],     #blueviolet	#8A2BE2	RGB(138,43,226) molding
+                 'deco':                    [0,238,238],      #cyan2	#00EEEE	RGB(0,238,238) deco
+                 'column':                  [255,0,0],        #red1	#FF0000	RGB(255,0,0) column
+                 'arch':                    [61,89,171],      #cobalt	#3D59AB	RGB(61,89,171) arch
+                 'drainpipe':               [255,165,0],      #orange1	#FFA500	RGB(255,165,0) drainpipe
+                 'stairs':                  [188,143,143],    #rosybrown	#BC8F8F	RGB(188,143,143) stairs
+                 'ground surface':          [124,252,0],      #lawngreen	#7CFC00	RGB(124,252,0) ground surface
+                 'terrain':                 [189,252,201],    #mint	#BDFCC9	RGB(189,252,201) terrain
                  'roof':	                [139,26,26],      #firebrick4	#8B1A1A	RGB(139,26,26) roof
-                 'blinds':	              [84,139,84],      #alegreen4	#548B54	RGB(84,139,84) blinds
+                 'blinds':	                [84,139,84],      #alegreen4	#548B54	RGB(84,139,84) blinds
                  'outer ceiling surface':	[184,134,11],     #darkgoldenrod	#B8860B	RGB(184,134,11) outer ceiling surface
                  'interior':	            [255,255,0]}      #yellow1	#FFFF00	RGB(255,255,0) interior
+                 'other':	                [105,105,105],    #dimgray	#696969	RGB(105,105,105) other
 g_label2color = {g_classes.index(cls): g_class2color[cls] for cls in g_classes}
 
-g_colorNames  = {'total':	                'papayawhip',         #papayawhip	#FFEFD5	RGB(255,239,213)
+g_colorNames  = {'total':	                'white',         
                  'wall':	                'eggshell',           #eggshell	#FCE6C9	RGB(252,230,201) wall
-                 'window':	              'cornflowerblue',     #cornflowerblue	#6495ED	RGB(100,149,237) window
-                 'door':                  'cadmiumorange',      #cadmiumorange	#FF6103	RGB(255,97,3) door
-                 'molding':               'blueviolet',         #blueviolet	#8A2BE2	RGB(138,43,226) molding
+                 'window':	                'cornflowerblue',     #cornflowerblue	#6495ED	RGB(100,149,237) window
+                 'door':                    'cadmiumorange',      #cadmiumorange	#FF6103	RGB(255,97,3) door
+                 'molding':                 'blueviolet',         #blueviolet	#8A2BE2	RGB(138,43,226) molding
                  'other':	                'dimgray',            #dimgray	#696969	RGB(105,105,105) other
-                 'terrain':               'mint',               #mint	#BDFCC9	RGB(189,252,201) terrain
-                 'column':                'red1',               #red1	#FF0000	RGB(255,0,0) column
-                 'arch':                  'cobalt',             #cobalt	#3D59AB	RGB(61,89,171) arch
-                 'balcony':               'teal',               #teal	#008080	RGB(0,128,128) balcony
-                 'deco':                  'cyan2',              #cyan2	#00EEEE	RGB(0,238,238) deco
-                 'drainpipe':             'orange1',            #orange1	#FFA500	RGB(255,165,0) drainpipe
-                 'stairs':                'rosybrown',          #rosybrown	#BC8F8F	RGB(188,143,143) stairs
-                 'ground surface':        'lawngreen',          #lawngreen	#7CFC00	RGB(124,252,0) ground surface
+                 'terrain':                 'mint',               #mint	#BDFCC9	RGB(189,252,201) terrain
+                 'column':                  'red1',               #red1	#FF0000	RGB(255,0,0) column
+                 'arch':                    'cobalt',             #cobalt	#3D59AB	RGB(61,89,171) arch
+                 'balcony':                 'teal',               #teal	#008080	RGB(0,128,128) balcony
+                 'deco':                    'cyan2',              #cyan2	#00EEEE	RGB(0,238,238) deco
+                 'drainpipe':               'orange1',            #orange1	#FFA500	RGB(255,165,0) drainpipe
+                 'stairs':                  'rosybrown',          #rosybrown	#BC8F8F	RGB(188,143,143) stairs
+                 'ground surface':          'lawngreen',          #lawngreen	#7CFC00	RGB(124,252,0) ground surface
                  'roof':	                'firebrick4',         #firebrick4	#8B1A1A	RGB(139,26,26) roof
-                 'blinds':	              'lawngreen',          #lawngreen	#548B54	RGB(84,139,84) blinds
+                 'blinds':	                'lawngreen',          #lawngreen	#548B54	RGB(84,139,84) blinds
                  'outer ceiling surface':	'darkgoldenrod',      #darkgoldenrod	#B8860B	RGB(184,134,11) outer ceiling surface
                  'interior':	            'yellow1'}            #yellow1	#FFFF00	RGB(255,255,0) interior
 
