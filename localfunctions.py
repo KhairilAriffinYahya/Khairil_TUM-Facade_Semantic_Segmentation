@@ -54,7 +54,7 @@ g_class2color = {'total':	                [255,255,255],    #white
                  'blinds':	                [84,139,84],      #alegreen4	#548B54	RGB(84,139,84) blinds
                  'outer ceiling surface':	[184,134,11],     #darkgoldenrod	#B8860B	RGB(184,134,11) outer ceiling surface
                  'interior':	            [255,255,0]}      #yellow1	#FFFF00	RGB(255,255,0) interior
-                 'other':	                [105,105,105],    #dimgray	#696969	RGB(105,105,105) other
+                 'other':	                [105,105,105]}   #dimgray	#696969	RGB(105,105,105) other
 g_label2color = {g_classes.index(cls): g_class2color[cls] for cls in g_classes}
 
 g_colorNames  = {'total':	                'white',         
