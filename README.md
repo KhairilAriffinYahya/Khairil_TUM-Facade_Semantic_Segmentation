@@ -20,7 +20,7 @@ pip install open3d
 ## Dataset of TUM-Facade
 Download from https://github.com/OloOcki/tum-facade.
 
-### Run in Google Colab
+## Run in Google Colab
 
 Example 1:
 
